@@ -179,13 +179,34 @@
   box-shadow: var(--shadow-card);
 }
 
+.trust-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .trust-breakdown h3 {
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
   color: var(--medium-gray);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 16px;
+}
+
+.safety-link-btn {
+  background: none;
+  border: none;
+  color: var(--primary-blue);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.safety-link-btn:hover {
+  text-decoration: underline;
 }
 
 .trust-item {

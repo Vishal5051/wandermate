@@ -200,7 +200,7 @@ function CreatePinModal({ onClose, onSuccess, initialLocation }) {
             <div className="form-group">
               <label className="form-label"><Smile size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> VIBE CHECK</label>
               <div className="mood-selector">
-                {['📍', '☕', '🏨', '⛰️', '🏖️', '🚌', '🍽️', '🎵', '📸', '✨'].map((emoji) => (
+                {['📍', '☕', '🏨', '⛰️', '🏖️', '🍽️', '📸', '✨', '🧘', '🚴', '🏰', '🛶', '🛤️', '🎒', '🌇', '🏮', '🎭'].map((emoji) => (
                   <button key={emoji} type="button" className={`mood-btn ${formData.mood_emoji === emoji ? 'selected' : ''}`}
                     onClick={() => setFormData({ ...formData, mood_emoji: emoji })}>{emoji}</button>
                 ))}

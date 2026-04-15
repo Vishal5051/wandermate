@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { usersAPI } from '../../utils/api';
 import axios from 'axios';
-import { MapPin, Navigation, Clock, Calendar, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, Clock, Calendar, CheckCircle2, ShieldCheck, Heart } from 'lucide-react';
+import SafetyCenter from '../Safety/SafetyCenter';
 import './Profile.css';
 
 function Profile({ user, setUser }) {
@@ -15,6 +16,7 @@ function Profile({ user, setUser }) {
   const [activeTab, setActiveTab] = useState('profile');
   const [activities, setActivities] = useState({ hosted: [], attending: [] });
   const [actLoading, setActLoading] = useState(false);
+  const [showSafetyCenter, setShowSafetyCenter] = useState(false);
 
   useEffect(() => { fetchProfile(); }, []);
 
@@ -110,6 +112,10 @@ function Profile({ user, setUser }) {
     localStorage.removeItem('user');
     window.location.href = '/login';
   };
+  
+  if (showSafetyCenter) {
+    return <SafetyCenter user={user} onBack={() => setShowSafetyCenter(false)} />;
+  }
 
   if (loading) return <div className="profile-page" style={{display:'flex',alignItems:'center',justifyContent:'center'}}><div className="spinner"></div></div>;
 
@@ -144,21 +150,25 @@ function Profile({ user, setUser }) {
           <div className="stat-label">Trust Score</div>
         </div>
         <div className="profile-stat">
-          <div className="stat-value activities">23</div>
+          <div className="stat-value activities">{profile?.hosted_count || 0}</div>
           <div className="stat-label">Activities</div>
         </div>
         <div className="profile-stat">
-          <div className="stat-value connections">41</div>
+          <div className="stat-value connections">{profile?.connections_count || 0}</div>
           <div className="stat-label">Connections</div>
         </div>
       </div>
 
       {/* Badges */}
       <div className="profile-badges">
-        {profile?.verification_level === 'verified' && (
-          <span className="profile-badge verified">✓ ID Verified</span>
+        {profile?.aadhaar_status === 'verified' && (
+          <span className="profile-badge verified" onClick={() => setShowSafetyCenter(true)} style={{cursor:'pointer'}}>
+            <ShieldCheck size={14} style={{marginRight:4}} /> ID Verified
+          </span>
         )}
-        <span className="profile-badge host">⭐ Top Host</span>
+        {profile?.hosted_count > 5 && (
+          <span className="profile-badge host">⭐ Top Host</span>
+        )}
         <span className="profile-badge explorer">🧭 Explorer</span>
       </div>
 
@@ -182,21 +192,44 @@ function Profile({ user, setUser }) {
         <>
           {/* Trust breakdown */}
           <div className="trust-breakdown">
-            <h3>TRUST SCORE BREAKDOWN</h3>
-            <div className="trust-item">
-              <span className="trust-item-label">ID Verified</span>
-              <div className="trust-item-bar"><div className="trust-item-fill" style={{width:'100%',background:'var(--forest-green)'}} /></div>
-              <span className="trust-item-value green">+30</span>
+            <div className="trust-header">
+              <h3>TRUST SCORE BREAKDOWN</h3>
+              <button className="safety-link-btn" onClick={() => setShowSafetyCenter(true)}>Safety Center ➔</button>
             </div>
+            
+            <div className="trust-item">
+              <span className="trust-item-label">Identity Verified</span>
+              <div className="trust-item-bar">
+                <div className="trust-item-fill" style={{
+                  width: profile?.aadhaar_status === 'verified' ? '100%' : '20%',
+                  background: profile?.aadhaar_status === 'verified' ? 'var(--forest-green)' : '#cbd5e1'
+                }} />
+              </div>
+              <span className={`trust-item-value ${profile?.aadhaar_status === 'verified' ? 'green' : 'gray'}`}>
+                {profile?.aadhaar_status === 'verified' ? '+30' : '0'}
+              </span>
+            </div>
+            
             <div className="trust-item">
               <span className="trust-item-label">Activities Hosted</span>
-              <div className="trust-item-bar"><div className="trust-item-fill" style={{width:'60%',background:'var(--primary-blue)'}} /></div>
-              <span className="trust-item-value blue">+24</span>
+              <div className="trust-item-bar">
+                <div className="trust-item-fill" style={{
+                  width: `${Math.min(100, (profile?.hosted_count || 0) * 10)}%`,
+                  background: 'var(--primary-blue)'
+                }} />
+              </div>
+              <span className="trust-item-value blue">+{Math.min(50, (profile?.hosted_count || 0) * 2)}</span>
             </div>
+            
             <div className="trust-item">
               <span className="trust-item-label">Reviews Received</span>
-              <div className="trust-item-bar"><div className="trust-item-fill" style={{width:'60%',background:'var(--sunset-orange)'}} /></div>
-              <span className="trust-item-value orange">+24</span>
+              <div className="trust-item-bar">
+                <div className="trust-item-fill" style={{
+                  width: `${Math.min(100, (profile?.reviews_count || 0) * 20)}%`,
+                  background: 'var(--sunset-orange)'
+                }} />
+              </div>
+              <span className="trust-item-value orange">+{Math.min(50, (profile?.reviews_count || 0) * 5)}</span>
             </div>
           </div>
 

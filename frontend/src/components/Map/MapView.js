@@ -9,13 +9,16 @@ import CreatePinModal from '../Journal/CreatePinModal';
 import './MapView.css';
 
 const activityEmoji = {
-  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Day Trip': '🚗',
-  'Skill Share': '📚', 'Language Exchange': '💬', 'Yoga': '🧘', 'Other': '📍'
+  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Yoga': '🧘', 'Food Tour': '🍜',
+  'Arts': '🎨', 'Photography': '📸', 'Weekend Trip': '🎒', 'Sports': '🏀',
+  'Spiritual': '🛕', 'Community': '🤝', 'Other': '📍'
 };
 
 const activityColor = {
-  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Day Trip': '#EA580C',
-  'Skill Share': '#2563EB', 'Language Exchange': '#EC4899', 'Yoga': '#059669', 'Other': '#6B7280'
+  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Yoga': '#10B981',
+  'Food Tour': '#F59E0B', 'Arts': '#EC4899', 'Photography': '#6366F1',
+  'Weekend Trip': '#F97316', 'Sports': '#3B82F6', 'Spiritual': '#8B5CF6',
+  'Community': '#14B8A6', 'Other': '#6B7280'
 };
 
 // OpenFreeMap Liberty style (very clean, resembles Snapchat/premium styles)
@@ -338,7 +341,10 @@ function MapView({ user, onLocationChange }) {
                 </div>
                 <div className="card-center">
                   <div className="card-title">{act.title}</div>
-                  <div className="card-host">Host: {act.host_name}</div>
+                  <div className="card-host">
+                    Host: {act.host_name} 
+                    {act.host_verification === 'verified' && <span className="sheet-verified-badge" style={{marginLeft:6}}>✓</span>}
+                  </div>
                   <div className="card-meta">
                     <span>{new Date(act.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     <span className="dot">•</span>
@@ -370,7 +376,10 @@ function MapView({ user, onLocationChange }) {
               </div>
               <div className="sheet-text-content">
                 <h3 className="sheet-title">{selectedActivity.title}</h3>
-                <p className="sheet-subtitle">Host: {selectedActivity.host_name}</p>
+                <p className="sheet-subtitle">
+                  Host: {selectedActivity.host_name} 
+                  {selectedActivity.host_verification === 'verified' && <span className="sheet-verified-badge">✓ Verified</span>}
+                </p>
               </div>
               <div className="sheet-attendee-badge">
                 {selectedActivity.current_attendees}/{selectedActivity.capacity}

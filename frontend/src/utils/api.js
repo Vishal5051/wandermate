@@ -118,4 +118,16 @@ export const packagesAPI = {
   getProviderPackages: () => api.get('/packages/provider/packages'),
 };
 
+export const safetyAPI = {
+  getAadhaarStatus: () => api.get('/safety/aadhaar-status'),
+  verifyAadhaar: (data) => api.post('/safety/verify-aadhaar', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getContacts: () => api.get('/safety/contacts'),
+  addContact: (data) => api.post('/safety/contacts', data),
+  deleteContact: (id) => api.delete(`/safety/contacts/${id}`),
+  triggerSOS: (data) => api.post('/safety/sos', data),
+  addReview: (data) => api.post('/safety/review', data),
+};
+
 export default api;

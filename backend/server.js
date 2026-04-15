@@ -14,6 +14,7 @@ const marketplaceRoutes = require('./routes/marketplace');
 const { bookingRouter } = require('./routes/marketplace');
 const packageRoutes = require('./routes/packages');
 const waveRoutes = require('./routes/waves');
+const safetyRoutes = require('./routes/safety');
 
 const app = express();
 const server = http.createServer(app);
@@ -50,6 +51,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/bookings', bookingRouter);
 app.use('/api/packages', packageRoutes);
 app.use('/api/waves', waveRoutes);
+app.use('/api/safety', safetyRoutes);
 
 // 404 handler
 app.use((req, res) => {

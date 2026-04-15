@@ -17,6 +17,8 @@ import TravelPackages from './components/Packages/TravelPackages';
 import ProviderDashboard from './components/Provider/ProviderDashboard';
 import WaveDashboard from './components/Waves/WaveDashboard';
 import Navbar from './components/Layout/Navbar';
+import SOSButton from './components/Safety/SOSButton';
+import SafetyCenter from './components/Safety/SafetyCenter';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -76,6 +78,7 @@ function App() {
     <Router>
       <div className="App">
         {user && <Navbar user={user} onLogout={handleLogout} />}
+        {user && <SOSButton user={user} />}
         
         <Routes>
           {/* Public routes */}
@@ -120,6 +123,10 @@ function App() {
           <Route 
             path="/waves" 
             element={user ? <WaveDashboard user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/safety" 
+            element={user ? <SafetyCenter user={user} onBack={() => window.history.back()} /> : <Navigate to="/login" />} 
           />
 
           {/* Vendor routes */}

@@ -314,6 +314,19 @@
   font-weight: 500;
   color: #64748b;
   margin: 4px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-verified-badge {
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
 }
 
 .sheet-attendee-badge {
@@ -432,6 +445,26 @@
   .snap-bottom-sheet {
     padding-bottom: max(32px, env(safe-area-inset-bottom));
   }
+  
+  /* Lift the FABs above the bottom navbar */
+  .fab-container {
+    bottom: calc(var(--bottom-nav-height, 70px) + 24px);
+  }
+  
+  /* Lift the maplibre location controls above the bottom navbar and FABs */
+  .maplibregl-ctrl-bottom-right {
+    bottom: calc(var(--bottom-nav-height, 70px) + 180px) !important;
+  }
+  .maplibregl-ctrl-bottom-left {
+    bottom: calc(var(--bottom-nav-height, 70px) + 10px) !important;
+  }
+}
+
+/* Custom positioning for maplibre controls to sit above FABs on desktop too */
+.maplibregl-ctrl-bottom-right {
+  bottom: 190px !important;
+  right: 16px !important;
+  z-index: 90;
 }
 
 /* Pinning Mode Updates */

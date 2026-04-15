@@ -4,12 +4,15 @@ import { activitiesAPI } from '../../utils/api';
 import './Activities.css';
 
 const typeColors = {
-  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Day Trip': '#EA580C',
-  'Skill Share': '#2563EB', 'Yoga': '#059669', 'Other': '#6B7280'
+  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Yoga': '#10B981',
+  'Food Tour': '#F59E0B', 'Arts': '#EC4899', 'Photography': '#6366F1',
+  'Weekend Trip': '#F97316', 'Sports': '#3B82F6', 'Spiritual': '#8B5CF6',
+  'Community': '#14B8A6', 'Other': '#6B7280'
 };
 const typeEmoji = {
-  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Day Trip': '🚗',
-  'Skill Share': '📚', 'Language Exchange': '💬', 'Yoga': '🧘', 'Other': '📍'
+  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Yoga': '🧘', 'Food Tour': '🍜',
+  'Arts': '🎨', 'Photography': '📸', 'Weekend Trip': '🎒', 'Sports': '🏀',
+  'Spiritual': '🛕', 'Community': '🤝', 'Other': '📍'
 };
 
 function ActivityDetails({ user }) {

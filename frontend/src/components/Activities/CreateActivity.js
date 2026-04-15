@@ -13,8 +13,14 @@ const activityTypes = [
   { value: 'Cafe', icon: '☕', label: 'Cafe' },
   { value: 'Hike', icon: '⛰️', label: 'Hike' },
   { value: 'Night Out', icon: '✨', label: 'Night Out' },
-  { value: 'Day Trip', icon: '🚗', label: 'Day Trip' },
-  { value: 'Skill Share', icon: '📚', label: 'Skill' },
+  { value: 'Yoga', icon: '🧘', label: 'Wellness' },
+  { value: 'Food Tour', icon: '🍜', label: 'Foodie' },
+  { value: 'Arts', icon: '🎨', label: 'Creative' },
+  { value: 'Photography', icon: '📸', label: 'Photo' },
+  { value: 'Weekend Trip', icon: '🎒', label: 'Getaway' },
+  { value: 'Sports', icon: '🏀', label: 'Sports' },
+  { value: 'Spiritual', icon: '🛕', label: 'Spiritual' },
+  { value: 'Community', icon: '🤝', label: 'Meetup' },
 ];
 
 const formatAddress = (feat) => {
