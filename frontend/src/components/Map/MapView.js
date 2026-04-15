@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/maplibre';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useNavigate } from 'react-router-dom';
-import L from 'leaflet';
-import { activitiesAPI } from '../../utils/api';
-import { MapPin, Settings, Bell, Plus, Navigation } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
+import { activitiesAPI, pinsAPI } from '../../utils/api';
+import { MapPin, Settings, Bell, Plus, Navigation, Search as SearchIcon, X, Map as MapIcon, Image as ImageIcon } from 'lucide-react';
+import axios from 'axios';
+import CreatePinModal from '../Journal/CreatePinModal';
 import './MapView.css';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
-});
 
 const activityEmoji = {
   'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Day Trip': '🚗',
@@ -24,214 +18,431 @@ const activityColor = {
   'Skill Share': '#2563EB', 'Language Exchange': '#EC4899', 'Yoga': '#059669', 'Other': '#6B7280'
 };
 
-function createActivityIcon(type) {
-  const emoji = activityEmoji[type] || '📍';
-  const bg = activityColor[type] || '#6B7280';
-  return L.divIcon({
-    html: `<div style="width:42px;height:42px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 12px rgba(0,0,0,0.25);border:2px solid #fff">${emoji}</div>`,
-    className: '',
-    iconSize: [42, 42],
-    iconAnchor: [21, 42],
-    popupAnchor: [0, -42],
-  });
-}
+// OpenFreeMap Liberty style (very clean, resembles Snapchat/premium styles)
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const RADIUS_KM = 50;
 
-function createUserIcon() {
-  return L.divIcon({
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563EB;border:3px solid #fff;box-shadow:0 0 0 2px #2563EB,0 2px 8px rgba(37,99,235,0.4)"></div>`,
-    className: '',
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-  });
-}
-
-const RADIUS_KM = 5;
-const RADIUS_METERS = RADIUS_KM * 1000;
-
-function FlyToLocation({ position }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) {
-      map.flyTo([position.lat, position.lng], 14, { duration: 1.5 });
-    }
-  }, [map, position]);
-  return null;
-}
+const formatAddress = (feat) => {
+  if (!feat || !feat.properties) return '';
+  const p = feat.properties;
+  const name = p.name || '';
+  const city = p.city || p.district || p.town || '';
+  const country = p.country || '';
+  
+  const parts = [];
+  if (name) parts.push(name);
+  if (city && city !== name) parts.push(city);
+  if (country && country !== city && country !== name) parts.push(country);
+  
+  return parts.join(', ');
+};
 
 function MapView({ user, onLocationChange }) {
-  const [position, setPosition] = useState(null);
+  const [viewState, setViewState] = useState({
+    latitude: 30.0869,
+    longitude: 78.2676,
+    zoom: 13
+  });
   const [activities, setActivities] = useState([]);
+  const [userPins, setUserPins] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedPin, setSelectedPin] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [locationName, setLocationName] = useState('Locating...');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinLocation, setPinLocation] = useState(null);
+  const [isPinningMode, setIsPinningMode] = useState(false);
+  const [showActivitiesList, setShowActivitiesList] = useState(false);
+  
+  const mapRef = useRef();
   const navigate = useNavigate();
-  const defaultPosition = [30.0869, 78.2676];
+  const lastFetchCoords = useRef({ lat: 0, lng: 0 });
+  const fetchTimeout = useRef(null);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setPosition(loc);
-          if (onLocationChange) onLocationChange(loc);
-          reverseGeocode(loc.lat, loc.lng);
-        },
-        () => {
-          const loc = { lat: defaultPosition[0], lng: defaultPosition[1] };
-          setPosition(loc);
-          if (onLocationChange) onLocationChange(loc);
-          setLocationName('Rishikesh');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    } else {
-      const loc = { lat: defaultPosition[0], lng: defaultPosition[1] };
-      setPosition(loc);
-      if (onLocationChange) onLocationChange(loc);
-      setLocationName('Rishikesh');
-    }
-  }, []);
-
-  const reverseGeocode = async (lat, lng) => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`);
-      const data = await res.json();
-      const city = data.address?.city || data.address?.town || data.address?.village || data.address?.county || 'Unknown';
-      setLocationName(city);
-    } catch {
-      setLocationName('Current Location');
-    }
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * 
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   };
 
-  useEffect(() => {
-    if (position) fetchActivities();
-  }, [position]);
+  const fetchData = async (lat, lng) => {
+    // Only fetch if moved more than 5km from last fetch
+    const dist = calculateDistance(lat, lng, lastFetchCoords.current.lat, lastFetchCoords.current.lng);
+    if (dist < 5 && activities.length > 0) return;
 
-  const fetchActivities = async () => {
     try {
       setLoading(true);
-      const res = await activitiesAPI.getNearby(position.lat, position.lng, RADIUS_METERS);
-      setActivities(res.data.activities || []);
+      lastFetchCoords.current = { lat, lng };
+      const [activitiesRes, pinsRes] = await Promise.all([
+        activitiesAPI.getNearby(lat, lng, RADIUS_KM * 1000),
+        pinsAPI.getAll(lat, lng, RADIUS_KM * 1000)
+      ]);
+      setActivities(activitiesRes.data.activities || []);
+      setUserPins(pinsRes.data.pins || []);
     } catch (err) {
-      console.error('Error fetching activities:', err);
+      console.error('Error fetching map data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const recenter = () => {
+  // Load data with debounce when position changes
+  useEffect(() => {
+    if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
+    fetchTimeout.current = setTimeout(() => {
+      fetchData(viewState.latitude, viewState.longitude);
+    }, 500);
+
+    return () => { if (fetchTimeout.current) clearTimeout(fetchTimeout.current); };
+  }, [viewState.latitude, viewState.longitude]);
+
+  // Initial location fetch
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setPosition(loc);
-          if (onLocationChange) onLocationChange(loc);
-          reverseGeocode(loc.lat, loc.lng);
+          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 13 };
+          setViewState(loc);
+          if (onLocationChange) onLocationChange({ lat: loc.latitude, lng: loc.longitude });
+          reverseGeocode(loc.latitude, loc.longitude);
         },
-        () => {}
+        () => {
+          setLocationName('Rishikesh');
+        }
       );
+    }
+  }, []);
+
+  const reverseGeocode = async (lat, lon) => {
+    try {
+      const res = await axios.get(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+      const feat = res.data.features?.[0];
+      if (feat) {
+        const fullName = formatAddress(feat);
+        setLocationName(fullName);
+      }
+    } catch (err) {
+      console.error('Reverse geocode error:', err);
     }
   };
 
-  const mapCenter = position ? [position.lat, position.lng] : defaultPosition;
+
+  // Photon Autocomplete Search
+  useEffect(() => {
+    if (searchTerm.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await axios.get(`https://photon.komoot.io/api/?q=${searchTerm}&limit=5`);
+        setSearchResults(res.data.features || []);
+        setShowResults(true);
+      } catch (err) {
+        console.error('Search error:', err);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  const handleSelectPlace = (feat) => {
+    const [lon, lat] = feat.geometry.coordinates;
+    const newLoc = { latitude: lat, longitude: lon, zoom: 14 };
+    setViewState(newLoc);
+    if (onLocationChange) onLocationChange({ lat, lng: lon });
+    
+    // Format display name
+    const fullName = formatAddress(feat);
+    setLocationName(fullName);
+    
+    setSearchTerm('');
+    setSearchResults([]);
+    setShowResults(false);
+    
+    if (mapRef.current) {
+      mapRef.current.getMap().flyTo({ center: [lon, lat], duration: 2000 });
+    }
+  };
+
+  const recenter = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, zoom: 14 };
+        setViewState(loc);
+        if (mapRef.current) {
+          mapRef.current.getMap().flyTo({ center: [loc.longitude, loc.latitude], duration: 1500 });
+        }
+        reverseGeocode(loc.latitude, loc.longitude);
+      });
+    }
+  };
 
   return (
-    <div className="map-page">
-      {/* Top bar */}
-      <div className="map-top-bar">
-        <div className="location-badge">
-          <MapPin size={16} className="location-badge-icon" />
-          <span>{locationName}</span>
-          <span className="radius-tag">{RADIUS_KM}km</span>
+    <div className="map-page immersion-theme">
+      {/* Pinning Mode Overlay */}
+      {isPinningMode && (
+        <div className="pinning-mode-banner">
+          Tap anywhere on the map to drop your memory pin
+          <button className="cancel-pinning-btn" onClick={() => setIsPinningMode(false)}>Cancel</button>
         </div>
-        <div className="map-top-actions">
-          <button className="map-icon-btn" onClick={recenter} title="Re-center">
-            <Navigation size={18} />
-          </button>
-          <button className="map-icon-btn"><Bell size={18} /></button>
+      )}
+
+      {/* Search & Location Bar */}
+      <div className={`map-top-container ${isPinningMode ? 'hidden-ui' : ''}`}>
+        <div className="search-bar-outer">
+          <div className="search-bar-wrapper">
+            <div className="search-icon-box">
+              <SearchIcon size={20} className="search-icon" />
+            </div>
+            <input
+              type="text"
+              placeholder="Where to next?"
+              className="map-search-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setShowResults(true)}
+            />
+            {searchTerm && (
+              <button className="clear-search" onClick={() => setSearchTerm('')}>
+                <X size={18} />
+              </button>
+            )}
+          </div>
+          
+          {/* Autocomplete Results */}
+          {showResults && searchResults.length > 0 && (
+            <div className="search-results-dropdown">
+              {searchResults.map((feat, i) => (
+                <div key={i} className="search-result-item" onClick={() => handleSelectPlace(feat)}>
+                  <MapPin size={16} className="item-icon" />
+                  <div className="item-text">
+                    <div className="item-name">{feat.properties.name}</div>
+                    <div className="item-sub">
+                      {[feat.properties.city, feat.properties.state, feat.properties.country].filter(Boolean).join(', ')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <div className="location-pill" onClick={recenter}>
+          <Navigation size={14} className="pill-icon" />
+          <span>{locationName}</span>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="map-container">
-        <MapContainer center={mapCenter} zoom={14} style={{ width: '100%', height: '100%' }} zoomControl={false}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          />
-          <FlyToLocation position={position} />
+      {/* Floating Buttons */}
+      <div className={`side-actions ${isPinningMode ? 'hidden-ui' : ''}`}>
+        <button className="action-btn" onClick={recenter} title="My Location">
+          <MapIcon size={20} />
+        </button>
+        <button className="action-btn"><Bell size={20} /></button>
+      </div>
 
-          {/* 5km radius circle */}
-          {position && (
-            <Circle
-              center={[position.lat, position.lng]}
-              radius={RADIUS_METERS}
-              pathOptions={{
-                color: '#2563EB',
-                fillColor: '#2563EB',
-                fillOpacity: 0.06,
-                weight: 1.5,
-                dashArray: '6 4'
-              }}
-            />
-          )}
-
-          {/* User location marker */}
-          {position && (
-            <Marker position={[position.lat, position.lng]} icon={createUserIcon()}>
-              <Popup>You are here</Popup>
-            </Marker>
-          )}
-
+      {/* Map Canvas */}
+      <div className="map-canvas">
+        <Map
+          {...viewState}
+          onMove={evt => setViewState(evt.viewState)}
+          ref={mapRef}
+          mapStyle={MAP_STYLE}
+          style={{ width: '100%', height: '100%', cursor: isPinningMode ? 'crosshair' : 'grab' }}
+          attributionControl={false}
+          onClick={(e) => {
+            if (isPinningMode) {
+              setPinLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+              setShowPinModal(true);
+              setIsPinningMode(false);
+            }
+          }}
+        >
+          {/* Activity Markers */}
           {activities.map((act) => (
             <Marker
               key={act.id}
-              position={[act.latitude, act.longitude]}
-              icon={createActivityIcon(act.activity_type)}
-              eventHandlers={{ click: () => setSelectedActivity(act) }}
-            />
+              latitude={parseFloat(act.latitude)}
+              longitude={parseFloat(act.longitude)}
+              anchor="bottom"
+              onClick={e => {
+                e.originalEvent.stopPropagation();
+                setSelectedActivity(act);
+              }}
+            >
+              <div className="premium-marker" style={{ background: activityColor[act.activity_type] || '#6B7280' }}>
+                {activityEmoji[act.activity_type] || '📍'}
+              </div>
+            </Marker>
           ))}
-        </MapContainer>
+
+          {/* User Specific Private Pins */}
+          {userPins.map((pin) => (
+            <Marker
+              key={`pin-${pin.id}`}
+              latitude={parseFloat(pin.latitude)}
+              longitude={parseFloat(pin.longitude)}
+              anchor="bottom"
+              onClick={e => {
+                e.originalEvent.stopPropagation();
+                setSelectedPin(pin);
+              }}
+            >
+              <div className="premium-marker pin-marker">
+                {pin.mood_emoji || '📍'}
+              </div>
+            </Marker>
+          ))}
+
+          {/* User Location Marker */}
+          <GeolocateControl position="bottom-right" />
+        </Map>
       </div>
 
-      {/* Activity count badge */}
-      {!loading && (
-        <div className="map-activity-count">
-          {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'} nearby
+      {/* Status Pill */}
+      {!loading && activities.length > 0 && (
+        <div className="activity-status-pill clickable" onClick={() => setShowActivitiesList(true)}>
+          <div className="status-dot" />
+          <span>{activities.length} WanderMates nearby</span>
         </div>
       )}
 
-      {/* Bottom sheet preview */}
-      {selectedActivity && (
-        <div className="map-bottom-sheet">
-          <div className="sheet-handle" />
-          <div className="sheet-activity-row">
-            <div className="sheet-activity-icon" style={{ background: activityColor[selectedActivity.activity_type] || '#6B7280' }}>
-              {activityEmoji[selectedActivity.activity_type] || '📍'}
-            </div>
-            <div className="sheet-activity-info">
-              <div className="sheet-activity-title">{selectedActivity.title}</div>
-              <div className="sheet-activity-meta">
-                <span>{selectedActivity.host_name}</span>
-                {selectedActivity.host_verification === 'verified' && <span className="badge badge-verified">✓ Verified</span>}
-              </div>
-              <div className="sheet-activity-meta">
-                <span>🕐 {new Date(selectedActivity.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                <span>📍 {selectedActivity.location_name}</span>
-              </div>
-            </div>
-            <div className="sheet-capacity">{selectedActivity.current_attendees}/{selectedActivity.capacity}</div>
+      {/* Activities List Drawer */}
+      {showActivitiesList && (
+        <div className={`activities-list-drawer ${showActivitiesList ? 'open' : ''}`}>
+          <div className="drawer-header">
+            <div className="drawer-drag-handle" onClick={() => setShowActivitiesList(false)} />
+            <h3>Nearby WanderMates</h3>
+            <button className="close-drawer" onClick={() => setShowActivitiesList(false)}><X size={20}/></button>
           </div>
-          <button className="sheet-join-btn" onClick={() => navigate(`/activity/${selectedActivity.id}`)}>
-            View Details
-          </button>
+          <div className="drawer-content">
+            {activities.map(act => (
+              <div key={act.id} className="activity-card-mini" onClick={() => {
+                setViewState({ latitude: parseFloat(act.latitude), longitude: parseFloat(act.longitude), zoom: 15 });
+                setSelectedActivity(act);
+                setShowActivitiesList(false);
+              }}>
+                <div className="card-left">
+                  <div className="card-type-icon" style={{ background: activityColor[act.activity_type] }}>
+                    {activityEmoji[act.activity_type]}
+                  </div>
+                </div>
+                <div className="card-center">
+                  <div className="card-title">{act.title}</div>
+                  <div className="card-host">Host: {act.host_name}</div>
+                  <div className="card-meta">
+                    <span>{new Date(act.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="dot">•</span>
+                    <span>{act.current_attendees}/{act.capacity} joined</span>
+                  </div>
+                </div>
+                <div className="card-right">
+                   <button className="btn-join-mini" onClick={(e) => {
+                     e.stopPropagation();
+                     navigate(`/activity/${act.id}`);
+                   }}>Join</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* FAB */}
-      <button className="map-fab" onClick={() => navigate('/create-activity')}>
-        <Plus size={24} />
-      </button>
+      {/* Snapchat Bottom Sheet */}
+      {selectedActivity && (
+        <div className="snap-bottom-sheet">
+          <div className="sheet-header">
+            <div className="sheet-drag-handle" onClick={() => setSelectedActivity(null)} />
+          </div>
+          <div className="sheet-body">
+            <div className="sheet-main-info">
+              <div className="sheet-activity-avatar" style={{ background: activityColor[selectedActivity.activity_type] || '#6B7280' }}>
+                {activityEmoji[selectedActivity.activity_type] || '📍'}
+              </div>
+              <div className="sheet-text-content">
+                <h3 className="sheet-title">{selectedActivity.title}</h3>
+                <p className="sheet-subtitle">Host: {selectedActivity.host_name}</p>
+              </div>
+              <div className="sheet-attendee-badge">
+                {selectedActivity.current_attendees}/{selectedActivity.capacity}
+              </div>
+            </div>
+            <div className="sheet-meta-grid">
+              <div className="meta-item">
+                <span className="meta-label">Time</span>
+                <span className="meta-value">{new Date(selectedActivity.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div className="meta-item">
+                <span className="meta-label">Type</span>
+                <span className="meta-value">{selectedActivity.activity_type}</span>
+              </div>
+            </div>
+            <button className="sheet-action-btn" onClick={() => navigate(`/activity/${selectedActivity.id}`)}>
+              View Details
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pin Details Bottom Sheet */}
+      {selectedPin && (
+        <div className="snap-bottom-sheet pin-details-sheet">
+          <div className="sheet-header">
+            <div className="sheet-drag-handle" onClick={() => setSelectedPin(null)} />
+          </div>
+          <div className="sheet-body">
+            <div className="sheet-main-info">
+              <div className="sheet-activity-avatar pin-avatar">
+                {selectedPin.mood_emoji || '📍'}
+              </div>
+              <div className="sheet-text-content">
+                <h3 className="sheet-title">{selectedPin.title || 'Personal Memory'}</h3>
+                <p className="sheet-subtitle">{selectedPin.location_name}</p>
+              </div>
+              <div className="sheet-date-badge">
+                {new Date(selectedPin.visit_date).toLocaleDateString()}
+              </div>
+            </div>
+            {selectedPin.note && <p className="sheet-description">{selectedPin.note}</p>}
+            <button className="sheet-action-btn" onClick={() => navigate('/journal')}>
+              Open in Journal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Buttons Container */}
+      <div className={`fab-container ${isPinningMode ? 'hidden-ui' : ''}`}>
+        <button className="snap-fab pin-fab" onClick={() => {
+          setIsPinningMode(true);
+        }} title="Drop a Pin">
+          <MapPin size={24} />
+        </button>
+        
+        <button className="snap-fab" onClick={() => navigate('/create-activity')} title="Create Event">
+          <Plus size={28} />
+        </button>
+      </div>
+
+      {/* Create Pin Modal */}
+      {showPinModal && (
+        <CreatePinModal 
+          onClose={() => setShowPinModal(false)}
+          onSuccess={() => {
+            alert('Memory saved successfully! View it in your Journal.');
+          }}
+          initialLocation={pinLocation}
+        />
+      )}
     </div>
   );
 }

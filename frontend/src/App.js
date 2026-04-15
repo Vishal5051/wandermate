@@ -15,6 +15,7 @@ import VendorDashboard from './components/Vendor/VendorDashboard';
 import VendorListings from './components/Vendor/VendorListings';
 import TravelPackages from './components/Packages/TravelPackages';
 import ProviderDashboard from './components/Provider/ProviderDashboard';
+import WaveDashboard from './components/Waves/WaveDashboard';
 import Navbar from './components/Layout/Navbar';
 
 function App() {
@@ -115,6 +116,10 @@ function App() {
           <Route 
             path="/packages" 
             element={user ? <TravelPackages user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/waves" 
+            element={user ? <WaveDashboard user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
           />
 
           {/* Vendor routes */}

@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -28,14 +29,12 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Create private pin
-router.post('/', [
-  authenticateToken,
+router.post('/', authenticateToken, upload.array('images', 5), [
   body('latitude').isFloat({ min: -90, max: 90 }),
   body('longitude').isFloat({ min: -180, max: 180 }),
-  body('location_name').optional().trim(),
-  body('title').optional().trim().isLength({ max: 255 }),
-  body('note').optional().trim().isLength({ max: 500 }),
-  body('photos').optional().isArray(),
+  body('location_name').notEmpty().trim(),
+  body('title').optional().trim(),
+  body('note').optional().trim(),
   body('mood_emoji').optional().trim(),
   body('visit_date').isISO8601()
 ], async (req, res) => {
@@ -46,8 +45,28 @@ router.post('/', [
 
   const {
     latitude, longitude, location_name, title, note,
-    photos, voice_note_url, mood_emoji, visit_date
+    voice_note_url, mood_emoji, visit_date
   } = req.body;
+
+  let photos = null;
+  if (req.files && req.files.length > 0) {
+    photos = req.files.map(file => `/uploads/${file.filename}`);
+  } else if (req.body.photos) {
+    try {
+      photos = JSON.parse(req.body.photos);
+    } catch(e) {
+      // Ignore parse error
+    }
+  }
+
+  // Format date for MySQL DATETIME (YYYY-MM-DD HH:MM:SS)
+  let formattedDate;
+  try {
+    const d = new Date(visit_date);
+    formattedDate = d.toISOString().slice(0, 19).replace('T', ' ');
+  } catch (e) {
+    formattedDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
 
   try {
     const rows = await db.callProc('sp_create_pin', [
@@ -55,7 +74,7 @@ router.post('/', [
       parseFloat(latitude), parseFloat(longitude),
       location_name || null, title || null, note || null,
       photos ? JSON.stringify(photos) : null,
-      voice_note_url || null, mood_emoji || null, visit_date
+      voice_note_url || null, mood_emoji || null, formattedDate
     ]);
 
     // Check if this location should become a recommendation
@@ -72,14 +91,18 @@ router.post('/', [
     res.status(201).json({
       message: 'Private pin created successfully',
       pin: {
-        ...rows[0],
+        ...(rows[0] || {}),
         latitude,
         longitude
       }
     });
   } catch (error) {
     console.error('Error creating private pin:', error);
-    res.status(500).json({ error: 'Server error creating pin' });
+    res.status(500).json({ 
+      error: 'Server error creating pin',
+      details: error.message,
+      sqlState: error.sqlState
+    });
   }
 });
 

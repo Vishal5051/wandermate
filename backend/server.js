@@ -13,6 +13,7 @@ const recommendationRoutes = require('./routes/recommendations');
 const marketplaceRoutes = require('./routes/marketplace');
 const { bookingRouter } = require('./routes/marketplace');
 const packageRoutes = require('./routes/packages');
+const waveRoutes = require('./routes/waves');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +23,7 @@ const wss = new WebSocket.Server({ server });
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Request logging
 app.use((req, res, next) => {
@@ -47,6 +49,7 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/bookings', bookingRouter);
 app.use('/api/packages', packageRoutes);
+app.use('/api/waves', waveRoutes);
 
 // 404 handler
 app.use((req, res) => {

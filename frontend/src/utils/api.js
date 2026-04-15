@@ -66,7 +66,11 @@ export const pinsAPI = {
   getAll: (lat, lng, radius) => 
     api.get('/pins', { params: { lat, lng, radius } }),
   getById: (id) => api.get(`/pins/${id}`),
-  create: (data) => api.post('/pins', data),
+  create: (data) => api.post('/pins', data, {
+    headers: {
+      'Content-Type': data instanceof FormData ? undefined : 'application/json'
+    }
+  }),
   update: (id, data) => api.patch(`/pins/${id}`, data),
   delete: (id) => api.delete(`/pins/${id}`),
 };

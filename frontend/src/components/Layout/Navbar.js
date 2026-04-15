@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Map, ShoppingBag, BookOpen, User, LayoutDashboard, Package, Compass } from 'lucide-react';
+import { Map, ShoppingBag, BookOpen, User, LayoutDashboard, Package, Compass, Car } from 'lucide-react';
 import './Navbar.css';
 
 function Navbar({ user, onLogout }) {
@@ -12,6 +12,7 @@ function Navbar({ user, onLogout }) {
 
   const travelerTabs = [
     { to: '/', icon: Map, label: 'Map', active: path === '/' },
+    { to: '/waves', icon: Car, label: 'Wave', active: path.startsWith('/wave') },
     { to: '/marketplace', icon: ShoppingBag, label: 'Marketplace', active: path === '/marketplace' },
     { to: '/packages', icon: Compass, label: 'Packages', active: path === '/packages' },
     { to: '/journal', icon: BookOpen, label: 'Journal', active: path === '/journal' },
