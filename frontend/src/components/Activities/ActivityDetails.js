@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { activitiesAPI } from '../../utils/api';
+import ReviewModal from '../Safety/ReviewModal';
+import ReportModal from '../Safety/ReportModal';
+import GroupChat from '../Chat/GroupChat';
+import { Phone, Mail, MessageSquare, MapPin, Clock, ShieldCheck } from 'lucide-react';
 import './Activities.css';
 
 const typeColors = {
@@ -22,6 +26,9 @@ function ActivityDetails({ user }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showReview, setShowReview] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState('details');
   const navigate = useNavigate();
 
   useEffect(() => { fetchActivity(); }, [id]);
@@ -80,6 +87,7 @@ function ActivityDetails({ user }) {
 
   const isHost = activity.host_id === user.id;
   const hasRSVPed = activity.is_rsvped > 0;
+  const isConfirmed = hasRSVPed;
   const isFull = activity.current_attendees >= activity.capacity;
   const startTime = new Date(activity.start_time);
   const isPast = startTime < new Date();
@@ -97,8 +105,64 @@ function ActivityDetails({ user }) {
         </div>
       </div>
 
-      <div className="activity-detail-body">
-        {/* Host */}
+      <div className="activity-detail-content">
+        <div className="activity-detail-main">
+          <div className="activity-detail-tabs">
+            <button 
+              className={`tab-btn ${activeSubTab === 'details' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('details')}
+            >
+              Details
+            </button>
+            {(isConfirmed || isHost) && (
+              <button 
+                className={`tab-btn ${activeSubTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveSubTab('chat')}
+              >
+                <MessageSquare size={16} style={{marginRight: 6}} /> Group Chat
+              </button>
+            )}
+          </div>
+
+          {activeSubTab === 'details' ? (
+            <>
+              <div className="activity-header">
+                <h1>{activity.title}</h1>
+                <div className="activity-meta">
+                  <span className="location"><MapPin size={16} /> {activity.location_name}</span>
+                  <span className="time"><Clock size={16} /> {startTime.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                </div>
+              </div>
+
+              <div className="activity-description">
+                <p>{activity.description || 'No description provided.'}</p>
+              </div>
+
+              {(isConfirmed || isHost) && (activity.host_phone || activity.host_email) && (
+                <div className="host-contact-section" style={{
+                  marginTop: 24, padding: 16, background: '#f0fdf4', border: '1px solid #dcfce7', borderRadius: 12
+                }}>
+                  <h3 style={{fontSize: 14, color: '#166534', marginBottom: 12, display:'flex', alignItems:'center', gap: 6}}>
+                    <ShieldCheck size={16} /> Host Contact Details
+                  </h3>
+                  <div style={{display:'flex', flexWrap:'wrap', gap: 20}}>
+                    {activity.host_phone && <div style={{display:'flex', alignItems:'center', gap: 8, fontSize: 13, color: '#14532d'}}>
+                      <Phone size={14} /> {activity.host_phone}
+                    </div>}
+                    {activity.host_email && <div style={{display:'flex', alignItems:'center', gap: 8, fontSize: 13, color: '#14532d'}}>
+                      <Mail size={14} /> {activity.host_email}
+                    </div>}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="activity-chat-wrapper" style={{marginTop: 20}}>
+              <GroupChat type="activity" id={id} user={user} />
+            </div>
+          )}
+        </div>
+
         <div className="activity-detail-host">
           <div className="detail-host-avatar">{activity.host_name?.charAt(0)}</div>
           <div className="detail-host-info">
@@ -108,7 +172,12 @@ function ActivityDetails({ user }) {
             </div>
             <div className="detail-host-meta">
               <span className="badge badge-trust">⭐ {activity.host_trust_score} Trust</span>
-              <a href="#profile" className="detail-view-profile">View Profile →</a>
+              <button 
+                onClick={() => setShowReport(true)} 
+                style={{ background:'none', border:'none', color:'#ef4444', fontSize:'11px', cursor:'pointer', padding:0, textDecoration:'underline', marginLeft:'8px' }}
+              >
+                Report Potential Fraud
+              </button>
             </div>
           </div>
         </div>
@@ -147,7 +216,14 @@ function ActivityDetails({ user }) {
             Delete Activity
           </button>
         ) : isPast ? (
-          <div className="past-message">This activity has ended</div>
+          <div className="past-container" style={{ width:'100%' }}>
+            <div className="past-message" style={{ marginBottom:'12px' }}>This activity has ended</div>
+            {hasRSVPed && (
+              <button onClick={() => setShowReview(true)} className="btn-modern btn-modern-primary" style={{ width:'100%' }}>
+                Post a Review for {activity.host_name}
+              </button>
+            )}
+          </div>
         ) : hasRSVPed ? (
           <button onClick={handleCancelRSVP} className="detail-join-btn" style={{ background: 'var(--alert-red)' }} disabled={actionLoading}>
             {actionLoading ? 'Processing...' : 'Cancel RSVP'}
@@ -159,10 +235,27 @@ function ActivityDetails({ user }) {
             <button onClick={handleRSVP} className="detail-join-btn" disabled={actionLoading}>
               {actionLoading ? 'Processing...' : '🎉 Join Activity'}
             </button>
-            <p className="detail-safety-note">⚠️ Meet in public places · Report if uncomfortable</p>
           </>
         )}
       </div>
+
+      {/* Modals */}
+      {showReview && (
+        <ReviewModal 
+          entityId={activity.host_id} 
+          entityType="user" 
+          entityName={activity.host_name} 
+          onClose={() => setShowReview(false)} 
+        />
+      )}
+      {showReport && (
+        <ReportModal 
+          entityId={activity.id} 
+          entityType="activity" 
+          entityName={activity.title} 
+          onClose={() => setShowReport(false)} 
+        />
+      )}
     </div>
   );
 }

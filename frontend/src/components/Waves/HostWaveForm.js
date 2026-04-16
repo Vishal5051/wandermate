@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import api from '../../utils/api';
-import { MapPin, Navigation, Calendar, Users, DollarSign } from 'lucide-react';
+import { MapPin, Navigation, Calendar, Users, DollarSign, ShieldCheck } from 'lucide-react';
 
-function HostWaveForm({ onSuccess }) {
+function HostWaveForm({ onSuccess, user }) {
   const [formData, setFormData] = useState({
     origin_name: '',
     origin_latitude: 0,
@@ -13,10 +13,16 @@ function HostWaveForm({ onSuccess }) {
     departure_time: '',
     capacity: 4,
     price_per_seat: '',
-    description: ''
+    description: '',
+    car_model: '',
+    car_number: ''
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const isIdentityVerified = user?.aadhaar_status === 'verified';
+  const isContactVerified = user?.phone_verified === 1 || user?.email_verified === 1;
+  const isFullyVerified = isIdentityVerified && isContactVerified;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,24 +30,19 @@ function HostWaveForm({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isFullyVerified) {
+      setError('Verification required in Profile & Safety Center to host a wave.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
-    const depTime = new Date(formData.departure_time);
-    if (isNaN(depTime.getTime())) {
-      setError('Please select a valid departure date and time');
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Format departure time to ISO 8601 with seconds if needed
       let formattedDepTime = formData.departure_time;
       if (formattedDepTime && formattedDepTime.length === 16) {
         formattedDepTime += ':00';
       }
 
-      // Mock coordinates for MVP (In real app, use Places API)
       const dataToSubmit = {
         ...formData,
         departure_time: formattedDepTime,
@@ -53,114 +54,116 @@ function HostWaveForm({ onSuccess }) {
         destination_longitude: 77.2,
       };
       
-      console.log('Submitting Wave:', dataToSubmit);
       const res = await api.post('/waves', dataToSubmit);
       if (onSuccess) onSuccess(res.data);
     } catch (err) {
-      console.error('Wave Creation Error:', err.response?.data);
-      const errorMessage = err.response?.data?.error || 
-                          (err.response?.data?.errors && err.response.data.errors[0]?.msg) || 
-                          'Failed to create wave. Please check all fields.';
-      setError(errorMessage);
+      setError(err.response?.data?.error || 'Failed to create wave.');
     } finally {
       setLoading(false);
     }
   };
 
   const pricePerSeat = parseFloat(formData.price_per_seat) || 0;
-  const serviceFee = pricePerSeat * 0.10; // 10% fee
+  const serviceFee = pricePerSeat * 0.10;
   const passengerPays = pricePerSeat + serviceFee;
 
   return (
-    <div className="wave-form-card">
-      <h2 style={{ marginBottom: '20px' }}>Host a Shared Cab</h2>
-      {error && <div className="error-message" style={{ color: 'red', marginBottom: '16px' }}>{error}</div>}
+    <div className="modern-form-container">
+      <div className="form-header-minimal">
+          <ShieldCheck size={20} color="var(--primary)" />
+          <h2>Host a New Wave</h2>
+      </div>
       
-      <form onSubmit={handleSubmit}>
-        <div className="wave-form-row">
-          <div className="form-group flex-1">
-            <label><MapPin size={16} style={{ display: 'inline', marginRight: '4px' }}/> Leaving from</label>
+      {!isFullyVerified && (
+        <div className="glass p-2 mb-3" style={{ borderLeft: '4px solid var(--danger)', borderRadius: 'var(--radius-md)' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 600 }}>
+            Identity & Contact Verification Required
+          </p>
+          <p style={{ fontSize: '13px' }}>Please complete your setup in the <a href="/profile" style={{ color: 'var(--primary)', fontWeight: 700 }}>Profile Center</a>.</p>
+        </div>
+      )}
+
+      {error && <div className="glass p-2 mb-3" style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '14px' }}>{error}</div>}
+      
+      <form onSubmit={handleSubmit} style={{ opacity: isFullyVerified ? 1 : 0.5 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="form-group">
+            <label className="form-label">Leaving from</label>
             <input 
-              type="text" 
-              name="origin_name" 
-              placeholder="E.g., Rishikesh" 
-              value={formData.origin_name}
-              onChange={handleChange}
-              required
+              type="text" name="origin_name" placeholder="E.g., Rishikesh" className="form-input"
+              value={formData.origin_name} onChange={handleChange} required disabled={!isFullyVerified} 
             />
           </div>
-          <div className="form-group flex-1">
-            <label><Navigation size={16} style={{ display: 'inline', marginRight: '4px' }}/> Going to</label>
+          <div className="form-group">
+            <label className="form-label">Going to</label>
             <input 
-              type="text" 
-              name="destination_name" 
-              placeholder="E.g., New Delhi" 
-              value={formData.destination_name}
-              onChange={handleChange}
-              required
+              type="text" name="destination_name" placeholder="E.g., New Delhi" className="form-input"
+              value={formData.destination_name} onChange={handleChange} required disabled={!isFullyVerified} 
             />
           </div>
         </div>
 
-        <div className="wave-form-row">
-          <div className="form-group flex-1">
-            <label><Calendar size={16} style={{ display: 'inline', marginRight: '4px' }}/> Departure Time</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label">Departure Time</label>
             <input 
-              type="datetime-local" 
-              name="departure_time" 
-              value={formData.departure_time}
-              onChange={handleChange}
-              required
+              type="datetime-local" name="departure_time" className="form-input"
+              value={formData.departure_time} onChange={handleChange} required disabled={!isFullyVerified} 
             />
           </div>
-          <div className="form-group flex-1" style={{ maxWidth: '150px' }}>
-            <label><Users size={16} style={{ display: 'inline', marginRight: '4px' }}/> Seats</label>
+          <div className="form-group">
+            <label className="form-label">Seats</label>
             <input 
-              type="number" 
-              name="capacity" 
-              min="1" 
-              max="8"
-              value={formData.capacity}
-              onChange={handleChange}
-              required
+              type="number" name="capacity" min="1" max="8" className="form-input"
+              value={formData.capacity} onChange={handleChange} required disabled={!isFullyVerified} 
             />
           </div>
         </div>
 
-        <div className="wave-form-row">
-          <div className="form-group flex-1">
-            <label><DollarSign size={16} style={{ display: 'inline', marginRight: '4px' }}/> Price per seat (You earn)</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="form-group">
+            <label className="form-label">Car Model</label>
             <input 
-              type="number" 
-              name="price_per_seat" 
-              placeholder="0.00" 
-              min="0"
-              step="0.01"
-              value={formData.price_per_seat}
-              onChange={handleChange}
-              required
+              type="text" name="car_model" placeholder="E.g., Toyota Innova" className="form-input"
+              value={formData.car_model} onChange={handleChange} required disabled={!isFullyVerified} 
             />
-            {pricePerSeat > 0 && (
-              <div className="fee-notice">
-                Passengers will pay <strong>${passengerPays.toFixed(2)}</strong> (${pricePerSeat.toFixed(2)} + 10% Wave service fee)
-              </div>
-            )}
+          </div>
+          <div className="form-group">
+            <label className="form-label">Car Number</label>
+            <input 
+              type="text" name="car_number" placeholder="E.g., UK07 AB 1234" className="form-input"
+              value={formData.car_number} onChange={handleChange} required disabled={!isFullyVerified} 
+            />
           </div>
         </div>
 
         <div className="form-group">
-          <label>Additional Notes</label>
+          <label className="form-label">Price per seat (You earn)</label>
+          <div className="input-wrapper" style={{ position: 'relative' }}>
+             <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800 }}>$</span>
+             <input 
+                type="number" name="price_per_seat" placeholder="0.00" min="0" step="0.01" className="form-input"
+                style={{ paddingLeft: '32px' }}
+                value={formData.price_per_seat} onChange={handleChange} required disabled={!isFullyVerified} 
+             />
+          </div>
+          {pricePerSeat > 0 && (
+            <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+              Passengers pay <strong>${passengerPays.toFixed(2)}</strong> (including 10% fee)
+            </div>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Additional Notes</label>
           <textarea 
-            name="description" 
-            placeholder="Luggage space, breaks, pet policy..." 
-            rows="3"
-            value={formData.description}
-            onChange={handleChange}
+            name="description" placeholder="Any preferences..." rows="2" className="form-textarea"
+            value={formData.description} onChange={handleChange} disabled={!isFullyVerified} 
           ></textarea>
         </div>
 
-        <button type="submit" className="submit-btn" disabled={loading}>
-          {loading ? 'Creating...' : 'Publish Wave'}
+        <button type="submit" className="btn-modern btn-modern-primary btn-full mt-2" disabled={loading || !isFullyVerified}>
+          {loading ? 'Publishing...' : 'Confirm & Publish Wave'}
         </button>
       </form>
     </div>

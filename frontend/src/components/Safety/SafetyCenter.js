@@ -6,6 +6,7 @@ import './Safety.css';
 function SafetyCenter({ user, onBack }) {
   const [aadhaarStatus, setAadhaarStatus] = useState('unverified');
   const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [aadhaarName, setAadhaarName] = useState('');
   const [aadhaarFile, setAadhaarFile] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,7 @@ function SafetyCenter({ user, onBack }) {
       setSubmitting(true);
       const formData = new FormData();
       formData.append('aadhaar_number', aadhaarNumber);
+      formData.append('aadhaar_name', aadhaarName);
       formData.append('aadhaar_image', aadhaarFile);
 
       await safetyAPI.verifyAadhaar(formData);
@@ -100,6 +102,7 @@ function SafetyCenter({ user, onBack }) {
               <div className="verification-instructions">
                 <h4>Take a clear photo of your Aadhaar Card</h4>
                 <ul>
+                  <li><CheckCircle size={14} /> Name must match your profile exactly</li>
                   <li><CheckCircle size={14} /> Place card on a flat, dark surface</li>
                   <li><CheckCircle size={14} /> Ensure good lighting (no glare)</li>
                   <li><CheckCircle size={14} /> All 4 corners should be visible</li>
@@ -108,6 +111,17 @@ function SafetyCenter({ user, onBack }) {
               </div>
 
               <form onSubmit={handleAadhaarSubmit} className="aadhaar-form">
+                <div className="form-group">
+                  <label>Name as on Aadhaar Card</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter your full name" 
+                    value={aadhaarName}
+                    onChange={(e) => setAadhaarName(e.target.value)}
+                    required
+                  />
+                </div>
+
                 <div className="form-group">
                   <label>Aadhaar Number (12 Digits)</label>
                   <input 

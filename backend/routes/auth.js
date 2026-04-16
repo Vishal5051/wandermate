@@ -66,7 +66,7 @@ router.post('/register', [
 
 // Login
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
+  body('email').notEmpty().withMessage('Email or Username is required'),
   body('password').exists()
 ], async (req, res) => {
   const errors = validationResult(req);

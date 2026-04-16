@@ -1,350 +1,493 @@
 import React, { useState, useEffect } from 'react';
-import { usersAPI } from '../../utils/api';
-import axios from 'axios';
-import { MapPin, Navigation, Clock, Calendar, CheckCircle2, ShieldCheck, Heart } from 'lucide-react';
-import SafetyCenter from '../Safety/SafetyCenter';
+import { usersAPI, wavesAPI, bookingAPI, packagesAPI, safetyAPI } from '../../utils/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  MapPin, Navigation, ShieldCheck, 
+  LogOut, Edit3, Calendar, ChevronRight, Star,
+  CheckCircle, Shield, Phone, Camera, Mail, X
+} from 'lucide-react';
 import './Profile.css';
+import './EditProfile.css';
 
-function Profile({ user, setUser }) {
-  const [profile, setProfile] = useState(null);
+function Profile({ user, setUser, userLocation, onLogout }) {
+  const [profile, setProfile] = useState(user || null);
   const [editing, setEditing] = useState(false);
-  const [formData, setFormData] = useState({ full_name: '', bio: '', home_location: '' });
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [showResults, setShowResults] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [formData, setFormData] = useState({ 
+    full_name: user?.full_name || '', 
+    bio: user?.bio || '', 
+    home_location: user?.home_location || '', 
+    email: user?.email || '', 
+    phone_number: user?.phone_number || '' 
+  });
+  const [loading, setLoading] = useState(!user);
+  
+  const [activeTab, setActiveTab] = useState('insights');
   const [activities, setActivities] = useState({ hosted: [], attending: [] });
+  const [waves, setWaves] = useState({ hosted: [], requested: [] });
+  const [bookings, setBookings] = useState([]);
+  const [packageBookings, setPackageBookings] = useState([]);
   const [actLoading, setActLoading] = useState(false);
-  const [showSafetyCenter, setShowSafetyCenter] = useState(false);
 
-  useEffect(() => { fetchProfile(); }, []);
+  const [aadhaarStatus, setAadhaarStatus] = useState('unverified');
+  // eslint-disable-next-line
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  // eslint-disable-next-line
+  const [aadhaarName, setAadhaarName] = useState('');
+  // eslint-disable-next-line
+  const [aadhaarFile, setAadhaarFile] = useState(null);
+  // eslint-disable-next-line
+  const [contacts, setContacts] = useState([]);
+  // eslint-disable-next-line
+  const [submittingAadhaar, setSubmittingAadhaar] = useState(false);
+  // eslint-disable-next-line
+  const [showContactForm, setShowContactForm] = useState(false);
+  // eslint-disable-next-line
+  const [newContact, setNewContact] = useState({ name: '', relationship: '', phone: '' });
+  // eslint-disable-next-line
+  const [otpCode, setOtpCode] = useState('');
+  // eslint-disable-next-line
+  const [otpSent, setOtpSent] = useState(false);
+  // eslint-disable-next-line
+  const [verifyingPhone, setVerifyingPhone] = useState(false);
+
+  useEffect(() => { 
+    fetchProfile();
+    fetchSafetyData();
+  }, []); // Run once on mount
 
   const fetchProfile = async () => {
     try {
-      setLoading(true);
       const res = await usersAPI.getProfile();
-      setProfile(res.data.user);
-      const loc = res.data.user.home_location || '';
+      const userData = res.data.user;
+      setProfile(userData); // Update local state for immediate render
+      
       setFormData({
-        full_name: res.data.user.full_name || '',
-        bio: res.data.user.bio || '',
-        home_location: loc
+        full_name: userData.full_name || '',
+        email: userData.email || '',
+        phone_number: userData.phone_number || '',
+        bio: userData.bio || '',
+        home_location: userData.home_location || ''
       });
-      setSearchTerm(loc);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { 
+      console.error('Profile fetch failed:', err); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  const fetchActivities = async () => {
+  const fetchSafetyData = async () => {
+    try {
+      const statusRes = await safetyAPI.getAadhaarStatus();
+      setAadhaarStatus(statusRes.data.status);
+      const contactsRes = await safetyAPI.getContacts();
+      setContacts(contactsRes.data.contacts);
+    } catch (err) { console.error('Error fetching safety data:', err); }
+  };
+
+  const fetchUnifiedActivities = async () => {
     try {
       setActLoading(true);
-      const res = await usersAPI.getMyActivities();
-      setActivities(res.data);
-    } catch (err) {
-      console.error('Error fetching activities:', err);
-    } finally {
-      setActLoading(false);
+      const [actRes, waveRes, bookRes, pkgRes] = await Promise.all([
+        usersAPI.getMyActivities(),
+        wavesAPI.getMyWaves(),
+        bookingAPI.getMyBookings(),
+        packagesAPI.getMyBookings()
+      ]);
+      setActivities(actRes.data || { hosted: [], attending: [] });
+      setWaves(waveRes.data || { hosted: [], requested: [] });
+      setBookings(bookRes.data?.bookings || []);
+      setPackageBookings(pkgRes.data?.bookings || []);
+    } catch (err) { 
+        console.error('Error fetching activities:', err); 
+    } finally { 
+        setActLoading(false); 
+        setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'activities') {
-      fetchActivities();
-    }
+    if (activeTab === 'travels') fetchUnifiedActivities();
   }, [activeTab]);
 
-  // Photon Autocomplete Search
-  useEffect(() => {
-    if (searchTerm.length < 3) {
-      setSearchResults([]);
-      return;
-    }
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        const res = await axios.get(`https://photon.komoot.io/api/?q=${searchTerm}&limit=5`);
-        setSearchResults(res.data.features || []);
-        setShowResults(true);
-      } catch (err) {
-        console.error('Search error:', err);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
-  const handleSelectPlace = (feat) => {
-    const name = feat.properties.name || feat.properties.city || feat.properties.state || '';
-    const country = feat.properties.country || '';
-    const fullName = `${name}${country ? ', ' + country : ''}`;
-    
-    setFormData(prev => ({ ...prev, home_location: fullName }));
-    setSearchTerm(fullName);
-    setSearchResults([]);
-    setShowResults(false);
-  };
-
-  const useCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
-          const res = await axios.get(`https://photon.komoot.io/reverse?lon=${pos.coords.longitude}&lat=${pos.coords.latitude}`);
-          const feat = res.data.features?.[0];
-          if (feat) {
-            const city = feat.properties.city || feat.properties.name || 'Current Location';
-            setFormData(prev => ({ ...prev, home_location: city }));
-            setSearchTerm(city);
-          }
-        } catch (err) { console.error(err); }
-      });
-    }
-  };
-
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     try {
-      const res = await usersAPI.updateProfile(formData);
-      setProfile(prev => ({ ...prev, ...res.data.user }));
+      const fd = new FormData();
+      Object.keys(formData).forEach(key => fd.append(key, formData[key]));
+      const res = await usersAPI.updateProfile(fd);
+      const updatedUser = res.data.user;
+      setProfile(updatedUser);
+      
+      // Update global state ONLY when saving changes
+      if (setUser) {
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      
       setEditing(false);
+      alert('Profile updated!');
     } catch (err) { alert('Failed to update profile'); }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogoutClick = () => {
+    if (onLogout) onLogout();
+    else {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
-  
-  if (showSafetyCenter) {
-    return <SafetyCenter user={user} onBack={() => setShowSafetyCenter(false)} />;
-  }
 
-  if (loading) return <div className="profile-page" style={{display:'flex',alignItems:'center',justifyContent:'center'}}><div className="spinner"></div></div>;
+  if (loading && !profile) return (
+    <div className="profile-page-modern">
+      <div className="loading-wave"><div className="spinner-modern"></div></div>
+    </div>
+  );
 
   const trustScore = profile?.trust_score || 0;
 
   return (
-    <div className="profile-page">
-      {/* Hero */}
-      <div className="profile-hero">
-        <div className="profile-hero-actions">
-          <button className="profile-icon-btn">⚙️</button>
-          <button className="profile-icon-btn">📤</button>
-        </div>
-        <div className="profile-avatar-wrapper">
-          <div className="profile-avatar">
-            {profile?.full_name?.charAt(0) || 'U'}
-          </div>
-          {profile?.is_verified === 1 && (
-            <div className="profile-verified-dot">✓</div>
-          )}
-        </div>
-        <div className="profile-name">{profile?.full_name}</div>
-        <div className="profile-location">
-          📍 {profile?.home_location || 'Rishikesh, India'} · Joined {new Date(profile?.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="profile-stats">
-        <div className="profile-stat">
-          <div className="stat-value trust">{trustScore}</div>
-          <div className="stat-label">Trust Score</div>
-        </div>
-        <div className="profile-stat">
-          <div className="stat-value activities">{profile?.hosted_count || 0}</div>
-          <div className="stat-label">Activities</div>
-        </div>
-        <div className="profile-stat">
-          <div className="stat-value connections">{profile?.connections_count || 0}</div>
-          <div className="stat-label">Connections</div>
-        </div>
-      </div>
-
-      {/* Badges */}
-      <div className="profile-badges">
-        {profile?.aadhaar_status === 'verified' && (
-          <span className="profile-badge verified" onClick={() => setShowSafetyCenter(true)} style={{cursor:'pointer'}}>
-            <ShieldCheck size={14} style={{marginRight:4}} /> ID Verified
-          </span>
-        )}
-        {profile?.hosted_count > 5 && (
-          <span className="profile-badge host">⭐ Top Host</span>
-        )}
-        <span className="profile-badge explorer">🧭 Explorer</span>
-      </div>
-
-      {/* Tabs */}
-      <div className="profile-tabs">
-        <button 
-          className={`profile-tab ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          Profile Info
-        </button>
-        <button 
-          className={`profile-tab ${activeTab === 'activities' ? 'active' : ''}`}
-          onClick={() => setActiveTab('activities')}
-        >
-          My Activities
-        </button>
-      </div>
-
-      {activeTab === 'profile' ? (
-        <>
-          {/* Trust breakdown */}
-          <div className="trust-breakdown">
-            <div className="trust-header">
-              <h3>TRUST SCORE BREAKDOWN</h3>
-              <button className="safety-link-btn" onClick={() => setShowSafetyCenter(true)}>Safety Center ➔</button>
+    <div className="profile-page-modern">
+      <div className="profile-layout-container">
+        
+        {/* LEFT COLUMN: Sidebar Card */}
+        <aside className="profile-sidebar">
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="sidebar-card-glass"
+          >
+            <div className="sidebar-header-actions">
+              <button className="edit-circle-btn" onClick={() => setEditing(!editing)}>
+                {editing ? <CheckCircle size={18} /> : <Edit3 size={18} />}
+              </button>
             </div>
-            
-            <div className="trust-item">
-              <span className="trust-item-label">Identity Verified</span>
-              <div className="trust-item-bar">
-                <div className="trust-item-fill" style={{
-                  width: profile?.aadhaar_status === 'verified' ? '100%' : '20%',
-                  background: profile?.aadhaar_status === 'verified' ? 'var(--forest-green)' : '#cbd5e1'
-                }} />
-              </div>
-              <span className={`trust-item-value ${profile?.aadhaar_status === 'verified' ? 'green' : 'gray'}`}>
-                {profile?.aadhaar_status === 'verified' ? '+30' : '0'}
-              </span>
-            </div>
-            
-            <div className="trust-item">
-              <span className="trust-item-label">Activities Hosted</span>
-              <div className="trust-item-bar">
-                <div className="trust-item-fill" style={{
-                  width: `${Math.min(100, (profile?.hosted_count || 0) * 10)}%`,
-                  background: 'var(--primary-blue)'
-                }} />
-              </div>
-              <span className="trust-item-value blue">+{Math.min(50, (profile?.hosted_count || 0) * 2)}</span>
-            </div>
-            
-            <div className="trust-item">
-              <span className="trust-item-label">Reviews Received</span>
-              <div className="trust-item-bar">
-                <div className="trust-item-fill" style={{
-                  width: `${Math.min(100, (profile?.reviews_count || 0) * 20)}%`,
-                  background: 'var(--sunset-orange)'
-                }} />
-              </div>
-              <span className="trust-item-value orange">+{Math.min(50, (profile?.reviews_count || 0) * 5)}</span>
-            </div>
-          </div>
 
-          {/* Actions */}
-          <div className="profile-actions">
-            <button className="btn btn-primary" onClick={() => setEditing(!editing)}>
-              {editing ? 'Cancel' : 'Edit Profile'}
-            </button>
-          </div>
+            <div className="profile-avatar-section">
+              <div className="main-avatar-v2">
+                {profile?.profile_photo ? (
+                  <img src={profile.profile_photo} alt={profile.full_name} />
+                ) : (
+                  profile?.full_name?.charAt(0) || user?.full_name?.charAt(0) || 'U'
+                )}
+                {aadhaarStatus === 'verified' && (
+                  <div className="verified-seal">
+                    <ShieldCheck size={24} fill="var(--teal)" color="white" />
+                  </div>
+                )}
+              </div>
+              <h2>{profile?.full_name || 'Traveler'}</h2>
+              <p className="user-handle">@{profile?.username || 'user'}</p>
+              
+              <div className="sidebar-meta">
+                <span className="sidebar-meta-item"><MapPin size={14} /> {profile?.home_location || 'Digital Nomad'}</span>
+                <span className="sidebar-meta-item"><Calendar size={14} /> Joined {profile?.created_at ? new Date(profile.created_at).toLocaleDateString(undefined, {month:'short', year:'numeric'}) : 'Recently'}</span>
+                {profile?.email && (
+                  <span className="sidebar-meta-item"><Mail size={14} /> {profile.email}</span>
+                )}
+                {profile?.phone_number && (
+                  <span className="sidebar-meta-item"><Phone size={14} /> {profile.phone_number}</span>
+                )}
+              </div>
+            </div>
 
-          {/* Edit form */}
-          {editing && (
-            <div className="edit-profile-section">
-              <h3>Edit Profile</h3>
-              <div className="form-group">
-                <label className="form-label">FULL NAME</label>
-                <input type="text" className="form-input" value={formData.full_name}
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})} />
+            <div className="sidebar-stats-grid">
+              <div className="sb-stat">
+                <span className="sb-stat-val">{Number(trustScore || 0)}</span>
+                <span className="sb-stat-lbl">Trust</span>
               </div>
-              <div className="form-group">
-                <label className="form-label">BIO</label>
-                <textarea className="form-textarea" value={formData.bio}
-                  onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                  placeholder="Tell travelers about yourself..." maxLength={500} rows={3} />
+              <div className="sb-stat">
+                <span className="sb-stat-val">{(Number(activities?.hosted?.length) || 0) + (Number(waves?.hosted?.length) || 0)}</span>
+                <span className="sb-stat-lbl">Hosted</span>
               </div>
-              <div className="form-group">
-                <label className="form-label">HOME LOCATION</label>
-                <div style={{position: 'relative'}}>
-                  <input type="text" className="form-input" value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onFocus={() => setShowResults(true)}
-                    placeholder="Search for your city..." />
-                  
-                  {showResults && searchResults.length > 0 && (
-                    <div className="profile-search-results">
-                      {searchResults.map((feat, i) => (
-                        <div key={i} className="profile-search-item" onClick={() => handleSelectPlace(feat)}>
-                          <MapPin size={16} />
-                          <span>{feat.properties.name}, {feat.properties.city || feat.properties.country}</span>
-                        </div>
-                      ))}
+              <div className="sb-stat">
+                <span className="sb-stat-val">{profile?.connections_count || 0}</span>
+                <span className="sb-stat-lbl">Vibes</span>
+              </div>
+            </div>
+
+            <nav className="profile-sidebar-nav">
+              {[
+                { id: 'insights', label: 'Overview', icon: Star },
+                { id: 'travels', label: 'Adventures', icon: Navigation },
+                { id: 'safety', label: 'Trust & Safety', icon: ShieldCheck }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  className={`sb-nav-item ${activeTab === tab.id ? 'active' : ''}`} 
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <div className="sb-nav-icon"><tab.icon size={18} /></div>
+                  <span>{tab.label}</span>
+                  <ChevronRight size={14} className="sb-nav-arrow" />
+                </button>
+              ))}
+            </nav>
+
+            <div className="sidebar-bio">
+              <h3>Bio</h3>
+              <p>{profile?.bio || "Just another WanderMate exploring the world..."}</p>
+            </div>
+
+            <div className="sidebar-actions">
+              <button className="btn-modern btn-modern-secondary btn-full" onClick={handleLogoutClick}>
+                <LogOut size={16} /> Logout
+              </button>
+            </div>
+          </motion.div>
+        </aside>
+
+        {/* RIGHT COLUMN: Tabbed Content */}
+        <main className="profile-main-content">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="tab-content-panel"
+            >
+              {activeTab === 'insights' && (
+                <>
+                  {aadhaarStatus !== 'verified' && (
+                    <motion.div whileHover={{ scale: 1.01 }} className="verification-banner-v2" onClick={() => setActiveTab('safety')}>
+                      <Shield size={32} />
+                      <div className="v-banner-content">
+                        <h4>Boost your trust score!</h4>
+                        <p>Verified accounts get 3x more host requests. Verify your Aadhaar now.</p>
+                      </div>
+                      <button className="v-btn-arrow">Verify ➔</button>
+                    </motion.div>
+                  )}
+
+                  <div className="trust-meter-card">
+                    <div className="tm-header">
+                       <ShieldCheck size={24} color="var(--teal)" />
+                       <div>
+                         <h3>Identity Status</h3>
+                         <p>Calculated based on your verified credentials</p>
+                       </div>
+                    </div>
+                    <div className="tm-points-list">
+                      <div className="tm-point">
+                        <span className="tm-point-info">Identity Verification</span>
+                        <span className={`tm-point-status ${aadhaarStatus === 'verified' ? 'status-verified' : 'status-missing'}`}>
+                          {aadhaarStatus === 'verified' ? 'Verified +40' : 'Missing'}
+                        </span>
+                      </div>
+                      <div className="tm-point">
+                        <span className="tm-point-info">Phone Connection</span>
+                        <span className={`tm-point-status ${profile?.phone_verified ? 'status-verified' : 'status-missing'}`}>
+                          {profile?.phone_verified ? 'Secure +20' : 'Pending'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="quick-stats-row">
+                    <div className="q-stat-card glass-card">
+                      <Star size={20} color="var(--coral)" />
+                      <h4>Experiences</h4>
+                      <p className="large-val">{(bookings?.length || 0) + (packageBookings?.length || 0)}</p>
+                    </div>
+                    <div className="q-stat-card glass-card">
+                      <Navigation size={20} color="var(--teal)" />
+                      <h4>Connections</h4>
+                      <p className="large-val">{profile?.connections_count || 0}</p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'travels' && (
+                <div className="travels-tab">
+                  {actLoading ? <div className="loading-wave"><div className="spinner-modern"></div></div> : (
+                    <div className="unified-timeline">
+                      <section className="timeline-section">
+                        <h4>Upcoming Adventures</h4>
+                        {[...(activities?.hosted || []), ...(activities?.attending || [])].length === 0 ? (
+                           <div className="timeline-item">
+                             <p>Your journey is just beginning. Host or join an activity to see it here!</p>
+                           </div>
+                        ) : (
+                          [...(activities?.hosted || []), ...(activities?.attending || [])].map((act, i) => (
+                            <div key={act.id || i} className="timeline-item">
+                               <div className="tl-icon"><Calendar size={20} /></div>
+                               <div className="tl-details">
+                                  <h5>{act.title || 'Untitled Activity'}</h5>
+                                  <p>{act.start_time ? new Date(act.start_time).toLocaleDateString() : 'Date TBD'}</p>
+                               </div>
+                               <ChevronRight size={16} className="ml-auto opacity-30" />
+                            </div>
+                          ))
+                        )}
+                      </section>
                     </div>
                   )}
                 </div>
-              </div>
-              <button type="button" onClick={useCurrentLocation} className="btn-location-inline">
-                <Navigation size={14} /> Use Current Location
-              </button>
-              <button className="btn btn-primary btn-full" style={{marginTop:'20px'}} onClick={handleSave}>Save Changes</button>
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="profile-activities-list">
-          {actLoading ? (
-            <div style={{padding: '40px', textAlign: 'center'}}><div className="spinner"></div></div>
-          ) : (
-            <>
-              {activities.hosted.length > 0 && (
-                <div className="activity-section">
-                  <h4 className="section-title">HOSTING ({activities.hosted.length})</h4>
-                  {activities.hosted.map(act => (
-                    <div key={act.id} className="profile-activity-card">
-                      <div className="act-icon"><Calendar size={20} /></div>
-                      <div className="act-details">
-                        <div className="act-title">{act.title}</div>
-                        <div className="act-info">
-                          <Clock size={12} /> {new Date(act.start_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                        </div>
-                        <div className="act-info">
-                          <MapPin size={12} /> {act.location_name}
-                        </div>
-                      </div>
-                      <div className="act-status hosting">HOST</div>
+              )}
+
+              {activeTab === 'safety' && (
+                <div className="safety-tab">
+                  <div className="v-card-v2">
+                    <div className="v-header">
+                      <h3>Security & Privacy</h3>
+                      {profile?.phone_verified && <span className="v-badge-done">Secured ✓</span>}
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {activities.attending.length > 0 && (
-                <div className="activity-section">
-                  <h4 className="section-title">JOINING ({activities.attending.length})</h4>
-                  {activities.attending.map(act => (
-                    <div key={act.id} className="profile-activity-card">
-                      <div className="act-icon attending"><CheckCircle2 size={20} /></div>
-                      <div className="act-details">
-                        <div className="act-title">{act.title}</div>
-                        <div className="act-info">
-                          <Clock size={12} /> {new Date(act.start_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    <div className="v-grid-v2">
+                      <div className={`v-item-v2 ${aadhaarStatus === 'verified' ? 'verified' : ''}`}>
+                        <div className="v-icon-box"><ShieldCheck size={20} /></div>
+                        <div className="v-info">
+                          <h5>Aadhaar ID</h5>
+                          <p>{aadhaarStatus === 'verified' ? 'Verified Official' : 'Verification Required'}</p>
                         </div>
-                        <div className="act-info">
-                          Host: <strong>{act.host_name}</strong>
-                        </div>
+                        {aadhaarStatus === 'verified' ? <CheckCircle size={18} className="v-done" /> : (
+                           <button className="v-action-btn">Start</button>
+                        )}
                       </div>
-                      <div className="act-status joined">JOINED</div>
+                      <div className={`v-item-v2 ${profile?.phone_verified ? 'verified' : ''}`}>
+                        <div className="v-icon-box"><Phone size={20} /></div>
+                        <div className="v-info">
+                          <h5>Phone #</h5>
+                          <p>{profile?.phone_verified ? 'Verified Active' : 'Unverified'}</p>
+                        </div>
+                        {profile?.phone_verified ? <CheckCircle size={18} className="v-done" /> : (
+                           <button className="v-action-btn">Verify</button>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
-
-              {activities.hosted.length === 0 && activities.attending.length === 0 && (
-                <div className="empty-state">
-                  <p>You haven't planned any activities yet.</p>
-                  <button className="btn btn-primary" onClick={() => window.location.href='/activities'}>Explore Activities</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Logout */}
-      <div className="logout-section">
-        <button className="logout-btn" onClick={handleLogout}>🚪 Sign Out</button>
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
+
+      {editing && (
+        <EditProfileModal 
+          formData={formData} 
+          setFormData={setFormData}
+          onSave={handleSaveProfile}
+          onClose={() => setEditing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditProfileModal({ formData, setFormData, onSave, onClose }) {
+  const [photoPreview, setPhotoPreview] = useState(null);
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, profile_photo: file });
+      const reader = new FileReader();
+      reader.onloadend = () => setPhotoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="edit-profile-overlay" onClick={onClose}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="edit-profile-modal" 
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="ep-header">
+          <div className="ep-header-text">
+            <h2>Edit Profile</h2>
+            <p>Customize your WanderMate identity</p>
+          </div>
+          <button className="close-ep-btn" onClick={onClose}><X size={20}/></button>
+        </div>
+
+        <div className="ep-body">
+          {/* Avatar Section */}
+          <div className="ep-photo-suite">
+            <div className="ep-avatar-preview">
+              {photoPreview ? <img src={photoPreview} alt="Preview" /> : (formData.profile_photo_url ? <img src={formData.profile_photo_url} alt="Profile" /> : formData.full_name?.charAt(0))}
+            </div>
+            <div className="ep-photo-controls">
+              <h4>Profile Picture</h4>
+              <label className="upload-trigger">
+                 <Camera size={14} /> Change Photo
+                 <input type="file" hidden accept="image/*" onChange={handlePhotoChange} />
+              </label>
+            </div>
+          </div>
+
+          <div className="ep-form-sections">
+            <h5 className="ep-section-title">Personal Information</h5>
+            <div className="ep-grid">
+              <div className="ep-input-group">
+                <label className="ep-label">Full Name</label>
+                <input 
+                  className="ep-input" 
+                  value={formData.full_name} 
+                  onChange={e => setFormData({...formData, full_name: e.target.value})} 
+                  placeholder="Enter your name"
+                />
+              </div>
+              <div className="ep-input-group">
+                <label className="ep-label">Home Base</label>
+                <input 
+                  className="ep-input" 
+                  value={formData.home_location} 
+                  onChange={e => setFormData({...formData, home_location: e.target.value})} 
+                  placeholder="e.g. London, UK"
+                />
+              </div>
+              <div className="ep-input-group">
+                <label className="ep-label">Email Address</label>
+                <div className="ep-input-icon-wrap">
+                  <span className="ep-input-icon"><Mail size={15} /></span>
+                  <input 
+                    className="ep-input ep-input-with-icon" 
+                    type="email"
+                    value={formData.email} 
+                    onChange={e => setFormData({...formData, email: e.target.value})} 
+                    placeholder="your@email.com"
+                  />
+                </div>
+              </div>
+              <div className="ep-input-group">
+                <label className="ep-label">Contact Number</label>
+                <div className="ep-input-icon-wrap">
+                  <span className="ep-input-icon"><Phone size={15} /></span>
+                  <input 
+                    className="ep-input ep-input-with-icon" 
+                    type="tel"
+                    value={formData.phone_number} 
+                    onChange={e => setFormData({...formData, phone_number: e.target.value})} 
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <h5 className="ep-section-title mt-4">About Me</h5>
+            <div className="ep-input-group">
+              <label className="ep-label">Story / Bio</label>
+              <textarea 
+                className="ep-input ep-textarea" 
+                rows="3"
+                value={formData.bio} 
+                onChange={e => setFormData({...formData, bio: e.target.value})} 
+                placeholder="Tell the world about your travels..."
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="ep-footer">
+          <button className="btn-modern btn-modern-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-modern btn-modern-primary" onClick={onSave}>Save Changes</button>
+        </div>
+      </motion.div>
     </div>
   );
 }

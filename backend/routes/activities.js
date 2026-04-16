@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkVerified } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -33,6 +33,7 @@ router.get('/nearby', authenticateToken, async (req, res) => {
 // Create new activity
 router.post('/', [
   authenticateToken,
+  checkVerified,
   body('title').trim().isLength({ min: 3, max: 255 }),
   body('description').optional().trim(),
   body('activity_type').isIn(['Hike', 'Cafe', 'Night Out', 'Day Trip', 'Skill Share', 'Language Exchange', 'Other']),

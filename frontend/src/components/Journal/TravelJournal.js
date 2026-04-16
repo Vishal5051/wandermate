@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Globe, Compass } from 'lucide-react';
 import { pinsAPI } from '../../utils/api';
 import MemoryLine from './MemoryLine';
-import './TravelJournal.css';
 
 function TravelJournal({ user }) {
   const [pins, setPins] = useState([]);
@@ -22,15 +23,12 @@ function TravelJournal({ user }) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const { latitude, longitude } = pos.coords;
-          
-          // Reverse geocode to get city name for display
           try {
             const res = await fetch(`https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}`);
             const data = await res.json();
             const feat = data.features?.[0];
             if (feat) {
               const p = feat.properties;
-              // Use city or town or district
               const cityName = p.city || p.town || p.district || p.name || 'Nearby';
               setCurrentCity(cityName);
             } else {
@@ -39,7 +37,6 @@ function TravelJournal({ user }) {
           } catch (e) {
             setCurrentCity('Current Area');
           }
-          
           fetchPins(latitude, longitude, 50000); 
         },
         () => {
@@ -71,28 +68,40 @@ function TravelJournal({ user }) {
     }
   };
 
-  if (loading) return <div className="journal-page" style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'60vh'}}><div className="spinner"></div></div>;
+  if (loading) return (
+    <div className="journal-page">
+      <div className="loading-wave"><div className="spinner-modern"></div></div>
+    </div>
+  );
 
   return (
-    <div className="journal-page immersion-theme" style={{ backgroundColor: '#f0f4f8' }}>
-      {/* Top bar */}
-      <div className="journal-top-bar" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'transparent', borderBottom: 'none', paddingTop: '32px', gap: '8px' }}>
-        <h1 style={{ fontSize: '32px', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '2px', color: '#1e293b', margin: 0 }}>
-          Memory Line
-        </h1>
-        <div className="location-filter-toggle" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', color: '#64748b', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} onClick={() => setUseLocationFilter(!useLocationFilter)}>
-          <span style={{ color: useLocationFilter ? '#3b82f6' : '#94a3b8' }}>{useLocationFilter ? `📍 Memories in ${currentCity || '...'}` : '🌍 All Memories'}</span>
-        </div>
+    <div className="journal-page">
+      <div className="journal-top-bar">
+        <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>Story Journal</motion.h1>
+        <motion.div 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="location-filter-wrapper" 
+            onClick={() => setUseLocationFilter(!useLocationFilter)}
+        >
+          <div className="status-dot-teal"></div>
+          <span className="location-filter-label">
+            {useLocationFilter ? `Tracing memories in ${currentCity || '...'}` : 'Spanning the globe'}
+          </span>
+          {useLocationFilter ? <Compass size={16} /> : <Globe size={16} />}
+        </motion.div>
       </div>
 
-      <div className="journal-dashboard-grid" style={{ gridTemplateColumns: '1fr', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px' }}>
-        
-        {/* Memory Line Section */}
-        <div className="journal-timeline-section" style={{ marginTop: '20px' }}>
-          <div className="timeline-wrapper">
-            <MemoryLine pins={pins} onDeletePin={handleDelete} />
+      <div className="journal-timeline-container">
+        <div className="vertical-line"></div>
+        {pins.length === 0 ? (
+          <div className="provider-empty" style={{ background: 'transparent' }}>
+             <h3>Silence in the valley</h3>
+             <p>No memories captured here yet. Start your journey on the map.</p>
           </div>
-        </div>
+        ) : (
+          <MemoryLine pins={pins} onDeletePin={handleDelete} />
+        )}
       </div>
 
     </div>

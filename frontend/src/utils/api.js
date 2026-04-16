@@ -57,7 +57,11 @@ export const activitiesAPI = {
 export const usersAPI = {
   getProfile: () => api.get('/users/me'),
   getUserById: (id) => api.get(`/users/${id}`),
-  updateProfile: (data) => api.patch('/users/me', data),
+  updateProfile: (data) => api.patch('/users/me', data, {
+    headers: {
+      'Content-Type': data instanceof FormData ? 'multipart/form-data' : 'application/json'
+    }
+  }),
   getMyActivities: () => api.get('/users/me/activities'),
 };
 
@@ -126,8 +130,27 @@ export const safetyAPI = {
   getContacts: () => api.get('/safety/contacts'),
   addContact: (data) => api.post('/safety/contacts', data),
   deleteContact: (id) => api.delete(`/safety/contacts/${id}`),
+  getSOSHistory: () => api.get('/safety/sos-history'),
   triggerSOS: (data) => api.post('/safety/sos', data),
+  sendOTP: (data) => api.post('/safety/send-otp', data),
+  verifyOTP: (data) => api.post('/safety/verify-otp', data),
+  sendEmailOTP: () => api.post('/safety/verify-email/send-otp'),
+  verifyEmailOTP: (data) => api.post('/safety/verify-email/confirm', data),
   addReview: (data) => api.post('/safety/review', data),
+  reportFraud: (data) => api.post('/safety/report', data),
+};
+
+// Waves endpoints
+export const wavesAPI = {
+  getAll: (params) => api.get('/waves', { params }),
+  getById: (id) => api.get(`/waves/${id}`),
+  create: (data) => api.post('/waves', data),
+  join: (id, data) => api.post(`/waves/${id}/join`, data),
+  getMyWaves: () => api.get('/waves/my-waves'),
+  getRequests: (id) => api.get(`/waves/${id}/requests`),
+  processRequest: (reqId, status) => api.put(`/waves/requests/${reqId}`, { status }),
+  deleteWave: (id) => api.delete(`/waves/${id}`),
+  cancelMember: (reqId, reason) => api.patch(`/waves/requests/${reqId}/cancel`, { reason }),
 };
 
 export default api;

@@ -136,11 +136,11 @@ function CreatePinModal({ onClose, onSuccess, initialLocation }) {
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content glass-modal form-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content glass-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: 500}}>
         <div className="modal-header">
           <h2>Capture a Memory</h2>
           <button type="button" className="modal-close-btn" onClick={handleClose}>
-            <X size={18} strokeWidth={2.5} />
+            <X size={20} />
           </button>
         </div>
 
@@ -157,9 +157,10 @@ function CreatePinModal({ onClose, onSuccess, initialLocation }) {
             <label className="photo-upload-btn">
               <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
               <div className="upload-icon-wrapper">
-                <ImageIcon size={32} strokeWidth={1.5} />
+                <ImageIcon size={40} />
               </div>
-              <span>Add up to 5 photos</span>
+              <span style={{fontWeight: 800, color: 'var(--text-main)'}}>Add Photos</span>
+              <span style={{fontSize: 12, marginTop: 4}}>Share up to 5 special moments</span>
             </label>
             {imagePreviews.length > 0 && (
               <div className="image-previews">
@@ -187,13 +188,13 @@ function CreatePinModal({ onClose, onSuccess, initialLocation }) {
             </div>
             
             <div className="form-group">
-              <label className="form-label"><Calendar size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> DATE & TIME *</label>
+              <label className="form-label"><Calendar size={14} style={{verticalAlign:'middle', marginRight:'6px'}}/> DATE & TIME *</label>
               <input type="datetime-local" name="visit_date" className="form-input" value={formData.visit_date} onChange={handleChange} required />
             </div>
 
             <div className="form-group">
-              <label className="form-label"><StickyNote size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> NOTE</label>
-              <textarea name="note" className="form-textarea" value={formData.note} onChange={handleChange} placeholder="Write something special..." rows="3" maxLength="500" />
+              <label className="form-label"><StickyNote size={14} style={{verticalAlign:'middle', marginRight:'6px'}}/> TELL THE STORY</label>
+              <textarea name="note" className="form-input" value={formData.note} onChange={handleChange} placeholder="Write something special about this moment..." rows="4" maxLength="500" />
               <div className="char-count">{formData.note.length}/500</div>
             </div>
 
@@ -211,7 +212,7 @@ function CreatePinModal({ onClose, onSuccess, initialLocation }) {
           <div className="modal-actions">
             <button type="button" onClick={handleClose} className="btn-secondary">Dismiss</button>
             <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving Memory...' : 'Save Memory'}
+              {isSubmitting ? 'Storytelling...' : 'Save Memory ✨'}
             </button>
           </div>
         </form>

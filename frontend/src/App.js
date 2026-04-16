@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './App.css';
 
 // Import components
@@ -12,18 +12,41 @@ import Profile from './components/Profile/Profile';
 import TravelJournal from './components/Journal/TravelJournal';
 import Marketplace from './components/Marketplace/Marketplace';
 import VendorDashboard from './components/Vendor/VendorDashboard';
-import VendorListings from './components/Vendor/VendorListings';
+// import VendorListings from './components/Vendor/VendorListings';
 import TravelPackages from './components/Packages/TravelPackages';
 import ProviderDashboard from './components/Provider/ProviderDashboard';
 import WaveDashboard from './components/Waves/WaveDashboard';
 import Navbar from './components/Layout/Navbar';
 import SOSButton from './components/Safety/SOSButton';
-import SafetyCenter from './components/Safety/SafetyCenter';
+
+import { motion, AnimatePresence } from 'framer-motion';
+
+const PageWrapper = ({ children }) => {
+  const pageVariants = {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 }
+  };
+
+  return (
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+      className="page-container"
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -35,19 +58,6 @@ function App() {
     setLoading(false);
   }, []);
 
-  // Get user location on login
-  useEffect(() => {
-    if (user && !userLocation) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => setUserLocation({ lat: 30.0869, lng: 78.2676 }),
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      }
-    }
-  }, [user]);
-
   const handleLogin = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -58,14 +68,13 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    setUserLocation(null);
   };
 
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading WanderMates...</p>
+        <div className="spinner-modern"></div>
+        <p>WanderMates is getting ready...</p>
       </div>
     );
   }
@@ -75,90 +84,68 @@ function App() {
   const defaultRoute = isVendor ? '/vendor/dashboard' : isProvider ? '/provider/dashboard' : '/';
 
   return (
-    <Router>
       <div className="App">
+        <div className="noise-bg" />
         {user && <Navbar user={user} onLogout={handleLogout} />}
         {user && <SOSButton user={user} />}
         
-        <Routes>
-          {/* Public routes */}
-          <Route 
-            path="/login" 
-            element={!user ? <Login onLogin={handleLogin} /> : <Navigate to={defaultRoute} />} 
-          />
-          <Route 
-            path="/register" 
-            element={!user ? <Register onLogin={handleLogin} /> : <Navigate to={defaultRoute} />} 
-          />
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            {/* Public routes */}
+            <Route 
+              path="/login" 
+              element={!user ? <Login onLogin={handleLogin} /> : <Navigate to={defaultRoute} />} 
+            />
+            <Route 
+              path="/register" 
+              element={!user ? <Register onLogin={handleLogin} /> : <Navigate to={defaultRoute} />} 
+            />
 
-          {/* Traveler routes */}
-          <Route 
-            path="/" 
-            element={user ? <MapView user={user} onLocationChange={setUserLocation} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/activity/:id" 
-            element={user ? <ActivityDetails user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/create-activity" 
-            element={user ? <CreateActivity user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/profile" 
-            element={user ? <Profile user={user} setUser={setUser} onLogout={handleLogout} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/journal" 
-            element={user ? <TravelJournal user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/marketplace" 
-            element={user ? <Marketplace user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/packages" 
-            element={user ? <TravelPackages user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/waves" 
-            element={user ? <WaveDashboard user={user} userLocation={userLocation} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/safety" 
-            element={user ? <SafetyCenter user={user} onBack={() => window.history.back()} /> : <Navigate to="/login" />} 
-          />
+            {/* Traveler routes */}
+            <Route 
+              path="/" 
+              element={user ? <MapView user={user} onLocationChange={setUserLocation} /> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/activity/:id" 
+              element={user ? <PageWrapper><ActivityDetails user={user} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/create-activity" 
+              element={user ? <PageWrapper><CreateActivity user={user} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/profile" 
+              element={user ? <PageWrapper><Profile user={user} setUser={setUser} userLocation={userLocation} onLogout={handleLogout} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/journal" 
+              element={user ? <PageWrapper><TravelJournal user={user} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/marketplace" 
+              element={user ? <PageWrapper><Marketplace user={user} userLocation={userLocation} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/packages" 
+              element={user ? <PageWrapper><TravelPackages user={user} userLocation={userLocation} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/waves" 
+              element={user ? <PageWrapper><WaveDashboard user={user} userLocation={userLocation} /></PageWrapper> : <Navigate to="/login" />} 
+            />
 
-          {/* Vendor routes */}
-          <Route 
-            path="/vendor/dashboard" 
-            element={user && isVendor ? <VendorDashboard user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/vendor/listings" 
-            element={user && isVendor ? <VendorListings user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/vendor/listings/new" 
-            element={user && isVendor ? <VendorListings user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/vendor/listings/edit/:id" 
-            element={user && isVendor ? <VendorListings user={user} /> : <Navigate to="/login" />} 
-          />
-
-          {/* Provider routes */}
-          <Route 
-            path="/provider/dashboard" 
-            element={user && isProvider ? <ProviderDashboard user={user} /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/provider/packages" 
-            element={user && isProvider ? <ProviderDashboard user={user} /> : <Navigate to="/login" />} 
-          />
-        </Routes>
+            <Route 
+              path="/vendor/dashboard" 
+              element={user && isVendor ? <PageWrapper><VendorDashboard user={user} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+            <Route 
+              path="/provider/dashboard" 
+              element={user && isProvider ? <PageWrapper><ProviderDashboard user={user} /></PageWrapper> : <Navigate to="/login" />} 
+            />
+          </Routes>
+        </AnimatePresence>
       </div>
-    </Router>
   );
 }
 

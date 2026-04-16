@@ -2,23 +2,32 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { activitiesAPI, pinsAPI } from '../../utils/api';
-import { MapPin, Settings, Bell, Plus, Navigation, Search as SearchIcon, X, Map as MapIcon, Image as ImageIcon } from 'lucide-react';
+import { MapPin, Settings, Bell, Plus, Navigation, Search as LucideSearch, X, Map as MapIcon, Image as ImageIcon, Clock } from 'lucide-react';
 import axios from 'axios';
 import CreatePinModal from '../Journal/CreatePinModal';
 import './MapView.css';
 
 const activityEmoji = {
-  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Yoga': '🧘', 'Food Tour': '🍜',
-  'Arts': '🎨', 'Photography': '📸', 'Weekend Trip': '🎒', 'Sports': '🏀',
-  'Spiritual': '🛕', 'Community': '🤝', 'Other': '📍'
+  'Hike': '🏔️', 'Cafe': '☕', 'Night Out': '🕺', 'Yoga': '🧘', 'Food Tour': '😋',
+  'Arts': '🎭', 'Photography': '📸', 'Weekend Trip': '🏕️', 'Sports': '⚽',
+  'Spiritual': '🛕', 'Community': '🙌', 'Other': '📍'
 };
 
 const activityColor = {
-  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Yoga': '#10B981',
-  'Food Tour': '#F59E0B', 'Arts': '#EC4899', 'Photography': '#6366F1',
-  'Weekend Trip': '#F97316', 'Sports': '#3B82F6', 'Spiritual': '#8B5CF6',
-  'Community': '#14B8A6', 'Other': '#6B7280'
+  'Hike': '#10B981', // Emerald
+  'Cafe': '#F97316', // Coral
+  'Night Out': '#8B5CF6', // Violet
+  'Yoga': '#0D9488', // Teal
+  'Food Tour': '#F43F5E', // Rose
+  'Arts': '#EC4899', // Pink
+  'Photography': '#06B6D4', // Cyan
+  'Weekend Trip': '#F59E0B', // Amber
+  'Sports': '#3B82F6', // Blue
+  'Spiritual': '#8B5CF6', // Violet
+  'Community': '#0D9488', // Teal
+  'Other': '#64748B'  // Slate
 };
 
 // OpenFreeMap Liberty style (very clean, resembles Snapchat/premium styles)
@@ -65,8 +74,21 @@ function MapView({ user, onLocationChange }) {
   const lastFetchCoords = useRef({ lat: 0, lng: 0 });
   const fetchTimeout = useRef(null);
 
+  const slideUp = {
+    initial: { y: '100%' },
+    animate: { y: 0 },
+    exit: { y: '100%' },
+    transition: { type: 'spring', damping: 25, stiffness: 200 }
+  };
+
+  const fadeInScale = {
+    initial: { opacity: 0, scale: 0.9 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.9 }
+  };
+
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -77,7 +99,6 @@ function MapView({ user, onLocationChange }) {
   };
 
   const fetchData = async (lat, lng) => {
-    // Only fetch if moved more than 5km from last fetch
     const dist = calculateDistance(lat, lng, lastFetchCoords.current.lat, lastFetchCoords.current.lng);
     if (dist < 5 && activities.length > 0) return;
 
@@ -97,7 +118,6 @@ function MapView({ user, onLocationChange }) {
     }
   };
 
-  // Load data with debounce when position changes
   useEffect(() => {
     if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
     fetchTimeout.current = setTimeout(() => {
@@ -107,7 +127,6 @@ function MapView({ user, onLocationChange }) {
     return () => { if (fetchTimeout.current) clearTimeout(fetchTimeout.current); };
   }, [viewState.latitude, viewState.longitude]);
 
-  // Initial location fetch
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -137,8 +156,6 @@ function MapView({ user, onLocationChange }) {
     }
   };
 
-
-  // Photon Autocomplete Search
   useEffect(() => {
     if (searchTerm.length < 3) {
       setSearchResults([]);
@@ -163,7 +180,6 @@ function MapView({ user, onLocationChange }) {
     setViewState(newLoc);
     if (onLocationChange) onLocationChange({ lat, lng: lon });
     
-    // Format display name
     const fullName = formatAddress(feat);
     setLocationName(fullName);
     
@@ -191,20 +207,28 @@ function MapView({ user, onLocationChange }) {
 
   return (
     <div className="map-page immersion-theme">
-      {/* Pinning Mode Overlay */}
-      {isPinningMode && (
-        <div className="pinning-mode-banner">
-          Tap anywhere on the map to drop your memory pin
-          <button className="cancel-pinning-btn" onClick={() => setIsPinningMode(false)}>Cancel</button>
-        </div>
-      )}
+      <AnimatePresence>
+        {isPinningMode && (
+          <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="pinning-mode-banner"
+          >
+            Tap anywhere to drop a pin
+            <button className="cancel-pinning-btn" onClick={() => setIsPinningMode(false)}>Cancel</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Search & Location Bar */}
-      <div className={`map-top-container ${isPinningMode ? 'hidden-ui' : ''}`}>
+      <motion.div 
+        animate={{ opacity: isPinningMode ? 0 : 1, y: isPinningMode ? -20 : 0 }}
+        className="map-top-container"
+      >
         <div className="search-bar-outer">
           <div className="search-bar-wrapper">
             <div className="search-icon-box">
-              <SearchIcon size={20} className="search-icon" />
+              <LucideSearch size={20} />
             </div>
             <input
               type="text"
@@ -221,39 +245,41 @@ function MapView({ user, onLocationChange }) {
             )}
           </div>
           
-          {/* Autocomplete Results */}
-          {showResults && searchResults.length > 0 && (
-            <div className="search-results-dropdown">
-              {searchResults.map((feat, i) => (
-                <div key={i} className="search-result-item" onClick={() => handleSelectPlace(feat)}>
-                  <MapPin size={16} className="item-icon" />
-                  <div className="item-text">
-                    <div className="item-name">{feat.properties.name}</div>
-                    <div className="item-sub">
-                      {[feat.properties.city, feat.properties.state, feat.properties.country].filter(Boolean).join(', ')}
+          <AnimatePresence>
+            {showResults && searchResults.length > 0 && (
+              <motion.div 
+                {...fadeInScale}
+                className="search-results-dropdown"
+              >
+                {searchResults.map((feat, i) => (
+                  <div key={i} className="search-result-item" onClick={() => handleSelectPlace(feat)}>
+                    <MapPin size={16} className="item-icon" />
+                    <div className="item-text">
+                      <div className="item-name">{feat.properties.name}</div>
+                      <div className="item-sub">
+                        {[feat.properties.city, feat.properties.state, feat.properties.country].filter(Boolean).join(', ')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         
         <div className="location-pill" onClick={recenter}>
           <Navigation size={14} className="pill-icon" />
           <span>{locationName}</span>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Floating Buttons */}
       <div className={`side-actions ${isPinningMode ? 'hidden-ui' : ''}`}>
-        <button className="action-btn" onClick={recenter} title="My Location">
+        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="action-btn" onClick={recenter}>
           <MapIcon size={20} />
-        </button>
-        <button className="action-btn"><Bell size={20} /></button>
+        </motion.button>
+        <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="action-btn"><Bell size={20} /></motion.button>
       </div>
 
-      {/* Map Canvas */}
       <div className="map-canvas">
         <Map
           {...viewState}
@@ -270,7 +296,6 @@ function MapView({ user, onLocationChange }) {
             }
           }}
         >
-          {/* Activity Markers */}
           {activities.map((act) => (
             <Marker
               key={act.id}
@@ -282,13 +307,16 @@ function MapView({ user, onLocationChange }) {
                 setSelectedActivity(act);
               }}
             >
-              <div className="premium-marker" style={{ background: activityColor[act.activity_type] || '#6B7280' }}>
+              <motion.div 
+                whileHover={{ scale: 1.2, y: -5 }}
+                className="premium-marker" 
+                style={{ background: activityColor[act.activity_type] || '#6B7280' }}
+              >
                 {activityEmoji[act.activity_type] || '📍'}
-              </div>
+              </motion.div>
             </Marker>
           ))}
 
-          {/* User Specific Private Pins */}
           {userPins.map((pin) => (
             <Marker
               key={`pin-${pin.id}`}
@@ -300,134 +328,150 @@ function MapView({ user, onLocationChange }) {
                 setSelectedPin(pin);
               }}
             >
-              <div className="premium-marker pin-marker">
+              <motion.div 
+                whileHover={{ scale: 1.2, y: -5 }}
+                className="premium-marker pin-marker"
+              >
                 {pin.mood_emoji || '📍'}
-              </div>
+              </motion.div>
             </Marker>
           ))}
 
-          {/* User Location Marker */}
           <GeolocateControl position="bottom-right" />
         </Map>
       </div>
 
-      {/* Status Pill */}
-      {!loading && activities.length > 0 && (
-        <div className="activity-status-pill clickable" onClick={() => setShowActivitiesList(true)}>
-          <div className="status-dot" />
-          <span>{activities.length} WanderMates nearby</span>
-        </div>
-      )}
+      <AnimatePresence>
+        {!loading && activities.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="activity-status-pill clickable" 
+            onClick={() => setShowActivitiesList(true)}
+          >
+            <div className="status-dot" />
+            <span>{activities.length} WanderMates nearby</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Activities List Drawer */}
-      {showActivitiesList && (
-        <div className={`activities-list-drawer ${showActivitiesList ? 'open' : ''}`}>
-          <div className="drawer-header">
-            <div className="drawer-drag-handle" onClick={() => setShowActivitiesList(false)} />
-            <h3>Nearby WanderMates</h3>
-            <button className="close-drawer" onClick={() => setShowActivitiesList(false)}><X size={20}/></button>
-          </div>
-          <div className="drawer-content">
-            {activities.map(act => (
-              <div key={act.id} className="activity-card-mini" onClick={() => {
-                setViewState({ latitude: parseFloat(act.latitude), longitude: parseFloat(act.longitude), zoom: 15 });
-                setSelectedActivity(act);
-                setShowActivitiesList(false);
-              }}>
-                <div className="card-left">
+      <AnimatePresence>
+        {showActivitiesList && (
+          <motion.div 
+            {...slideUp}
+            className="activities-list-drawer"
+          >
+            <div className="drawer-header">
+              <h3>Nearby WanderMates</h3>
+              <button className="close-drawer" onClick={() => setShowActivitiesList(false)}><X size={20}/></button>
+            </div>
+            <div className="drawer-content">
+              {activities.map(act => (
+                <motion.div 
+                  key={act.id} 
+                  whileHover={{ x: 5 }}
+                  className="activity-card-mini" 
+                  onClick={() => {
+                    setViewState({ latitude: parseFloat(act.latitude), longitude: parseFloat(act.longitude), zoom: 15 });
+                    setSelectedActivity(act);
+                    setShowActivitiesList(false);
+                  }}
+                >
                   <div className="card-type-icon" style={{ background: activityColor[act.activity_type] }}>
                     {activityEmoji[act.activity_type]}
                   </div>
-                </div>
-                <div className="card-center">
-                  <div className="card-title">{act.title}</div>
-                  <div className="card-host">
-                    Host: {act.host_name} 
-                    {act.host_verification === 'verified' && <span className="sheet-verified-badge" style={{marginLeft:6}}>✓</span>}
+                  <div className="card-mini-details">
+                    <h4>{act.title}</h4>
+                    <p>{act.host_name}</p>
+                    <span className="mini-time">{new Date(act.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                   </div>
-                  <div className="card-meta">
-                    <span>{new Date(act.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span className="dot">•</span>
-                    <span>{act.current_attendees}/{act.capacity} joined</span>
-                  </div>
-                </div>
-                <div className="card-right">
-                   <button className="btn-join-mini" onClick={(e) => {
-                     e.stopPropagation();
-                     navigate(`/activity/${act.id}`);
-                   }}>Join</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+                </motion.div>
+              ))}
+              {activities.length === 0 && <p className="empty-drawer-msg">No activities found nearby.</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Snapchat Bottom Sheet */}
-      {selectedActivity && (
-        <div className="snap-bottom-sheet">
-          <div className="sheet-header">
-            <div className="sheet-drag-handle" onClick={() => setSelectedActivity(null)} />
-          </div>
-          <div className="sheet-body">
-            <div className="sheet-main-info">
-              <div className="sheet-activity-avatar" style={{ background: activityColor[selectedActivity.activity_type] || '#6B7280' }}>
-                {activityEmoji[selectedActivity.activity_type] || '📍'}
-              </div>
-              <div className="sheet-text-content">
-                <h3 className="sheet-title">{selectedActivity.title}</h3>
-                <p className="sheet-subtitle">
-                  Host: {selectedActivity.host_name} 
-                  {selectedActivity.host_verification === 'verified' && <span className="sheet-verified-badge">✓ Verified</span>}
-                </p>
-              </div>
-              <div className="sheet-attendee-badge">
-                {selectedActivity.current_attendees}/{selectedActivity.capacity}
-              </div>
+      {/* Selected Memory Pin Sheet */}
+      <AnimatePresence>
+        {selectedPin && (
+          <motion.div 
+            {...slideUp}
+            className="bottom-sheet-card"
+          >
+            <div className="sheet-header">
+              <div className="sheet-drag-handle" onClick={() => setSelectedPin(null)} />
             </div>
-            <div className="sheet-meta-grid">
-              <div className="meta-item">
-                <span className="meta-label">Time</span>
-                <span className="meta-value">{new Date(selectedActivity.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="sheet-body">
+              <div className="sheet-main-info">
+                <div className="sheet-activity-avatar pin-avatar">
+                  {selectedPin.mood_emoji || '📍'}
+                </div>
+                <div className="sheet-text-content">
+                  <h3 className="sheet-title">{selectedPin.title || 'Personal Memory'}</h3>
+                  <p className="sheet-subtitle">{selectedPin.location_name}</p>
+                </div>
+                <div className="sheet-date-badge">
+                  {new Date(selectedPin.visit_date).toLocaleDateString()}
+                </div>
               </div>
-              <div className="meta-item">
-                <span className="meta-label">Type</span>
-                <span className="meta-value">{selectedActivity.activity_type}</span>
-              </div>
+              {selectedPin.note && <p className="sheet-description">{selectedPin.note}</p>}
+              <button className="sheet-action-btn" onClick={() => navigate('/journal')}>
+                Open in Journal
+              </button>
             </div>
-            <button className="sheet-action-btn" onClick={() => navigate(`/activity/${selectedActivity.id}`)}>
-              View Details
-            </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Pin Details Bottom Sheet */}
-      {selectedPin && (
-        <div className="snap-bottom-sheet pin-details-sheet">
-          <div className="sheet-header">
-            <div className="sheet-drag-handle" onClick={() => setSelectedPin(null)} />
-          </div>
-          <div className="sheet-body">
-            <div className="sheet-main-info">
-              <div className="sheet-activity-avatar pin-avatar">
-                {selectedPin.mood_emoji || '📍'}
-              </div>
-              <div className="sheet-text-content">
-                <h3 className="sheet-title">{selectedPin.title || 'Personal Memory'}</h3>
-                <p className="sheet-subtitle">{selectedPin.location_name}</p>
-              </div>
-              <div className="sheet-date-badge">
-                {new Date(selectedPin.visit_date).toLocaleDateString()}
-              </div>
+      {/* Selected Activity Sheet */}
+      <AnimatePresence>
+        {selectedActivity && (
+          <motion.div 
+            {...slideUp}
+            className="bottom-sheet-card"
+          >
+            <div className="sheet-header">
+              <div className="sheet-drag-handle" onClick={() => setSelectedActivity(null)} />
             </div>
-            {selectedPin.note && <p className="sheet-description">{selectedPin.note}</p>}
-            <button className="sheet-action-btn" onClick={() => navigate('/journal')}>
-              Open in Journal
-            </button>
-          </div>
-        </div>
-      )}
+            <div className="sheet-body">
+              <div className="sheet-main-info">
+                <div 
+                  className="sheet-activity-avatar"
+                  style={{ background: activityColor[selectedActivity.activity_type] }}
+                >
+                  {activityEmoji[selectedActivity.activity_type]}
+                </div>
+                <div className="sheet-text-content">
+                  <h3 className="sheet-title">{selectedActivity.title}</h3>
+                  <p className="sheet-subtitle">
+                    Hosted by <span style={{color:'var(--teal)', fontWeight:700}}>{selectedActivity.host_name}</span>
+                  </p>
+                </div>
+                <div className="sheet-status-badge">
+                  {selectedActivity.current_attendees}/{selectedActivity.capacity} Joined
+                </div>
+              </div>
+              
+              <div className="sheet-meta-strip">
+                <div className="meta-strip-item">
+                  <Clock size={14} />
+                  <span>{new Date(selectedActivity.start_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+                <div className="meta-strip-item">
+                  <MapPin size={14} />
+                  <span className="truncate">{selectedActivity.location_name}</span>
+                </div>
+              </div>
+
+              <button className="sheet-action-btn primary" onClick={() => navigate(`/activity/${selectedActivity.id}`)}>
+                View Details & Join
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Action Buttons Container */}
       <div className={`fab-container ${isPinningMode ? 'hidden-ui' : ''}`}>

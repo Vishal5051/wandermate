@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkVerified } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -79,6 +79,7 @@ router.get('/vendors/:id', authenticateToken, async (req, res) => {
 // Create a new listing (vendor / admin)
 router.post('/listings', [
   authenticateToken,
+  checkVerified,
   body('title').trim().isLength({ min: 3, max: 255 }),
   body('description').optional().trim(),
   body('category').isIn(['Yoga', 'Rafting', 'Stays', 'Camping', 'Cafe', 'Photography', 'Adventure', 'Other']),

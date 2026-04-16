@@ -294,11 +294,11 @@ function CreateActivity({ user }) {
 
         <div className="form-group">
           <label className="form-label">DESCRIPTION</label>
-          <textarea name="description" className="form-textarea" value={formData.description}
-            onChange={handleChange} placeholder="Tell people what to expect..." rows="3" />
+          <textarea name="description" className="form-input" value={formData.description}
+            onChange={handleChange} placeholder="Tell people what to expect..." rows="4" />
         </div>
 
-        <button type="button" onClick={getCurrentLocation} className="btn btn-secondary btn-full mb-2">
+        <button type="button" onClick={getCurrentLocation} className="btn-modern btn-modern-secondary btn-full mb-4">
           📍 Use Current Location
         </button>
 
@@ -308,15 +308,36 @@ function CreateActivity({ user }) {
             <p>Only visible to verified women</p>
           </div>
           <label className="toggle-switch">
-            <input type="checkbox" checked={formData.gender_filter === 'female'}
-              onChange={(e) => setFormData({ ...formData, gender_filter: e.target.checked ? 'female' : 'all' })} />
+            <input 
+              type="checkbox" 
+              checked={formData.gender_filter === 'female'}
+              onChange={(e) => {
+                const isFemaleOnly = e.target.checked;
+                let newDesc = formData.description;
+                const tag = "(WOMEN ONLY)";
+                
+                if (isFemaleOnly) {
+                  if (!newDesc.includes(tag)) {
+                    newDesc = tag + " " + newDesc;
+                  }
+                } else {
+                  newDesc = newDesc.replace(tag, "").trim();
+                }
+
+                setFormData({ 
+                  ...formData, 
+                  gender_filter: isFemaleOnly ? 'female' : 'all',
+                  description: newDesc
+                });
+              }} 
+            />
             <span className="toggle-slider" />
           </label>
         </div>
 
         {error && <div className="form-error" style={{marginTop:16}}>{error}</div>}
 
-        <button type="submit" className="btn btn-primary btn-full" style={{marginTop:24}} disabled={loading}>
+        <button type="submit" className="btn-modern btn-modern-primary btn-full shadow-teal" style={{marginTop:24}} disabled={loading}>
           {loading ? 'Creating...' : 'Create Activity 🎯'}
         </button>
       </form>

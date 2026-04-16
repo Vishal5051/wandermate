@@ -15,10 +15,12 @@ const { bookingRouter } = require('./routes/marketplace');
 const packageRoutes = require('./routes/packages');
 const waveRoutes = require('./routes/waves');
 const safetyRoutes = require('./routes/safety');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+const db = require('./config/database');
 
 // Middleware
 app.use(cors());
@@ -52,6 +54,7 @@ app.use('/api/bookings', bookingRouter);
 app.use('/api/packages', packageRoutes);
 app.use('/api/waves', waveRoutes);
 app.use('/api/safety', safetyRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -67,13 +70,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-// WebSocket connection handling for real-time updates
+// WebSocket connection handling for real-time updates and group chat
 const clients = new Map(); // userId -> WebSocket connection
+const rooms = new Map();   // roomId -> Set of userIds
 
 wss.on('connection', (ws, req) => {
   console.log('New WebSocket connection');
 
-  ws.on('message', (message) => {
+  ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
 
@@ -85,18 +89,64 @@ wss.on('connection', (ws, req) => {
         ws.send(JSON.stringify({ type: 'auth_success', message: 'Connected to real-time updates' }));
       }
 
-      // Handle activity updates broadcast
-      if (data.type === 'activity_created') {
-        broadcast({
-          type: 'new_activity',
-          activity: data.activity
-        }, ws.userId);
+      // GROUP CHAT: Join Room
+      if (data.type === 'join_room') {
+        const { roomId } = data;
+        ws.currentRoom = roomId;
+        console.log(`User ${ws.userId} joined room ${roomId}`);
+        
+        if (!rooms.has(roomId)) {
+          rooms.set(roomId, new Set());
+        }
+        rooms.get(roomId).add(ws.userId);
+        
+        ws.send(JSON.stringify({ type: 'room_joined', roomId }));
       }
 
+      // GROUP CHAT: Send Message
+      if (data.type === 'group_message') {
+        const { roomId, chatRoomId, text } = data;
+        
+        // 1. Save to Database
+        try {
+          await db.query(
+            'INSERT INTO group_messages (group_chat_id, sender_id, message) VALUES (?, ?, ?)',
+            [chatRoomId, ws.userId, text]
+          );
+
+          // 2. Broadcast to everyone in the room
+          const broadcastMsg = JSON.stringify({
+            type: 'new_group_message',
+            roomId,
+            message: {
+              sender_id: ws.userId,
+              content: text,
+              created_at: new Date().toISOString()
+            }
+          });
+
+          // Send to all clients subscribed to this room
+          const roomParticipants = rooms.get(roomId);
+          if (roomParticipants) {
+            roomParticipants.forEach(uid => {
+              const clientWs = clients.get(uid);
+              if (clientWs && clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(broadcastMsg);
+              }
+            });
+          }
+        } catch (dbErr) {
+          console.error('Error saving group message:', dbErr);
+        }
+      }
+
+      // Legacy notification logic ...
+      if (data.type === 'activity_created') {
+        broadcast({ type: 'new_activity', activity: data.activity }, ws.userId);
+      }
+      
       if (data.type === 'activity_rsvp') {
-        // Notify activity host
-        const hostId = data.hostId;
-        const hostWs = clients.get(hostId);
+        const hostWs = clients.get(data.hostId);
         if (hostWs && hostWs.readyState === WebSocket.OPEN) {
           hostWs.send(JSON.stringify({
             type: 'new_rsvp',
@@ -113,6 +163,10 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     if (ws.userId) {
       clients.delete(ws.userId);
+      // Remove from rooms
+      if (ws.currentRoom && rooms.has(ws.currentRoom)) {
+        rooms.get(ws.currentRoom).delete(ws.userId);
+      }
       console.log(`User ${ws.userId} disconnected from WebSocket`);
     }
   });

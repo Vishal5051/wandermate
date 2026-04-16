@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, checkVerified } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -82,6 +82,7 @@ router.get('/provider/packages', authenticateToken, async (req, res) => {
 // Create a travel package
 router.post('/', [
   authenticateToken,
+  checkVerified,
   body('title').trim().isLength({ min: 3, max: 255 }),
   body('destination').trim().isLength({ min: 2 }),
   body('duration_days').isInt({ min: 1, max: 90 }),

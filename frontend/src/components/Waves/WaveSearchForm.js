@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { MapPin, Navigation, Calendar } from 'lucide-react';
+import { MapPin, Navigation, Calendar, Search, ArrowLeftRight } from 'lucide-react';
+import './WaveSearchForm.css';
 
 function WaveSearchForm({ onSearch }) {
   const [searchParams, setSearchParams] = useState({
@@ -13,37 +14,56 @@ function WaveSearchForm({ onSearch }) {
     onSearch(searchParams);
   };
 
+  const swapLocations = () => {
+    setSearchParams(prev => ({
+      ...prev,
+      origin: prev.destination,
+      destination: prev.origin
+    }));
+  };
+
   return (
-    <div className="wave-form-card" style={{ padding: '16px' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="form-group flex-1" style={{ marginBottom: 0 }}>
-          <label><MapPin size={14} style={{ display: 'inline' }}/> Leaving from</label>
+    <div className="wave-search-bar">
+      <form onSubmit={handleSubmit} className="ws-form">
+        <div className="ws-input-wrapper">
+          <MapPin size={18} className="ws-icon" />
           <input 
             type="text" 
-            placeholder="Origin" 
+            className="ws-input"
+            placeholder="From where?" 
             value={searchParams.origin}
             onChange={(e) => setSearchParams({...searchParams, origin: e.target.value})}
           />
         </div>
-        <div className="form-group flex-1" style={{ marginBottom: 0 }}>
-          <label><Navigation size={14} style={{ display: 'inline' }}/> Going to</label>
+
+        <button type="button" className="ws-swap-btn" onClick={swapLocations} title="Swap Locations">
+          <ArrowLeftRight size={18} />
+        </button>
+
+        <div className="ws-input-wrapper">
+          <Navigation size={18} className="ws-icon" />
           <input 
             type="text" 
-            placeholder="Destination" 
+            className="ws-input"
+            placeholder="Going to?" 
             value={searchParams.destination}
             onChange={(e) => setSearchParams({...searchParams, destination: e.target.value})}
           />
         </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label><Calendar size={14} style={{ display: 'inline' }}/> Date</label>
+
+        <div className="ws-input-wrapper" style={{ maxWidth: '180px' }}>
+          <Calendar size={18} className="ws-icon" />
           <input 
             type="date" 
+            className="ws-input ws-input-date"
             value={searchParams.date}
             onChange={(e) => setSearchParams({...searchParams, date: e.target.value})}
           />
         </div>
-        <button type="submit" className="submit-btn" style={{ width: 'auto', marginTop: 0, padding: '10px 24px' }}>
-          Search
+
+        <button type="submit" className="ws-submit-btn">
+          <Search size={18} />
+          <span>Search</span>
         </button>
       </form>
     </div>

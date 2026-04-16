@@ -42,12 +42,13 @@ function SOSButton({ user }) {
       // Get current location
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const { latitude, longitude } = pos.coords;
-        await safetyAPI.triggerSOS({ latitude, longitude });
-        alert('🚨 SOS ALERT SENT! Emergency contacts have been notified with your location.');
+        const res = await safetyAPI.triggerSOS({ latitude, longitude });
+        alert('🚨 SOS SIGNAL RECEIVED! \n\n' + res.data.message);
       }, (err) => {
         // Fallback if location fails
-        safetyAPI.triggerSOS({ latitude: 0, longitude: 0 });
-        alert('🚨 SOS ALERT SENT! (Location unavailable)');
+        safetyAPI.triggerSOS({ latitude: 0, longitude: 0 }).then(res => {
+          alert('🚨 SOS SIGNAL RECEIVED! \n(Location unavailable)\n\n' + res.data.message);
+        });
       });
     } catch (err) {
       console.error('SOS Trigger Error:', err);

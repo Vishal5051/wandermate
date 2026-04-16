@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -53,20 +54,24 @@ router.get('/:identifier', authenticateToken, async (req, res) => {
 // Update user profile
 router.patch('/me', [
   authenticateToken,
+  upload.single('profile_photo'),
   body('full_name').optional().trim().isLength({ min: 2 }),
   body('bio').optional().trim().isLength({ max: 500 }),
-  body('home_location').optional().trim(),
-  body('languages').optional().isArray(),
-  body('interests').optional().isArray()
+  body('home_location').optional().trim()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { full_name, bio, profile_photo, home_location, languages, interests } = req.body;
+  let { full_name, email, phone_number, bio, home_location, languages, interests } = req.body;
+  let profilePhoto = req.file ? `/uploads/${req.file.filename}` : req.body.profile_photo;
 
-  if (!full_name && !bio && !profile_photo && !home_location && !languages && !interests) {
+  // When using form-data, these might come as strings
+  if (typeof languages === 'string') { try { languages = JSON.parse(languages); } catch(e) {} }
+  if (typeof interests === 'string') { try { interests = JSON.parse(interests); } catch(e) {} }
+
+  if (!full_name && !email && !phone_number && !bio && !profilePhoto && !home_location && !languages && !interests) {
     return res.status(400).json({ error: 'No valid fields to update' });
   }
 
@@ -74,8 +79,10 @@ router.patch('/me', [
     const rows = await db.callProc('sp_update_user_profile', [
       req.user.userId,
       full_name || null,
+      email || null,
+      phone_number || null,
       bio || null,
-      profile_photo || null,
+      profilePhoto || null,
       home_location || null,
       languages ? JSON.stringify(languages) : null,
       interests ? JSON.stringify(interests) : null
