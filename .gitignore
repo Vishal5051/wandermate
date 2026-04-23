@@ -30,13 +30,13 @@ logs/
 .idea/
 *.iml
 
-# Uploads
-uploads/
+# # Uploads
+# uploads/
 
-# Database
-*.sql
-*.db
-*.sqlite
+# # Database
+# *.sql
+# *.db
+# *.sqlite
 
 # Test coverage
 coverage/
